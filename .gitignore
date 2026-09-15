@@ -6,3 +6,6 @@ coverage/
 .env
 server/tests/.tmp/
 .DS_Store
+
+action.md
+*smells.md

@@ -61,3 +61,81 @@ export async function countTasks(projectId: number, f: TaskFilters): Promise<num
   if (f.search) return (await findTasks(projectId, f)).length;
   return db.task.count({ where: buildFilters(projectId, f) });
 }
+
+export function findById(id: number) {
+  return db.task.findUnique({ where: { id } });
+}
+
+export function insert(data: Prisma.TaskUncheckedCreateInput) {
+  return db.task.create({ data });
+}
+
+export function updateById(id: number, data: Prisma.TaskUncheckedUpdateInput) {
+  return db.task.update({ where: { id }, data });
+}
+
+/** Borra la tarea junto con sus comentarios, historial y tags, en ese orden. */
+export async function removeWithRelations(taskId: number): Promise<void> {
+  await db.comment.deleteMany({ where: { taskId } });
+  await db.taskHistory.deleteMany({ where: { taskId } });
+  await db.taskTag.deleteMany({ where: { taskId } });
+  await db.task.delete({ where: { id: taskId } });
+}
+
+export function findUserById(id: number) {
+  return db.user.findUnique({ where: { id } });
+}
+
+export function countComments(taskId: number) {
+  return db.comment.count({ where: { taskId } });
+}
+
+export function findMembership(projectId: number, userId: number) {
+  return db.projectMember.findUnique({
+    where: { projectId_userId: { projectId, userId } },
+  });
+}
+
+export function insertHistory(data: {
+  taskId: number;
+  changedById: number;
+  fromStatus: string | null;
+  toStatus: string;
+}) {
+  return db.taskHistory.create({ data });
+}
+
+export function listHistory(taskId: number) {
+  return db.taskHistory.findMany({
+    where: { taskId },
+    orderBy: { id: 'asc' },
+  });
+}
+
+export function countTags(taskId: number) {
+  return db.taskTag.count({ where: { taskId } });
+}
+
+export function findTagByName(name: string) {
+  return db.tag.findFirst({ where: { name } });
+}
+
+export function insertTag(name: string) {
+  return db.tag.create({ data: { name } });
+}
+
+export function insertTaskTag(taskId: number, tagId: number) {
+  return db.taskTag.create({ data: { taskId, tagId } });
+}
+
+export function findTaskTag(taskId: number, tagId: number) {
+  return db.taskTag.findFirst({ where: { taskId, tagId } });
+}
+
+export function removeTaskTagById(id: number) {
+  return db.taskTag.delete({ where: { id } });
+}
+
+export function listTaskTags(taskId: number) {
+  return db.taskTag.findMany({ where: { taskId }, include: { tag: true } });
+}

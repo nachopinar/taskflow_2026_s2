@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
-import { db } from '../../lib/db';
 import { notFound } from '../../lib/http';
-import { parsePublicId, toPublicId } from '../../lib/ids';
+import { parsePublicId } from '../../lib/ids';
 import * as repo from './tasks.repository';
 import * as service from './tasks.service';
 
@@ -27,23 +26,9 @@ export async function listByProject(req: Request, res: Response, next: NextFunct
     const limit = Math.min(Number(req.query.limit) || DEFAULT_LIMIT, MAX_LIMIT);
     const offset = Number(req.query.offset) || 0;
 
-    const rows = await repo.findTasks(projectId, filters);
+    const items = await service.listTasks(projectId, filters);
 
-    const items = [];
-    for (const row of rows) {
-      const assignee = row.assigneeId
-        ? await db.user.findUnique({ where: { id: row.assigneeId } })
-        : null;
-      const commentCount = await db.comment.count({ where: { taskId: row.id } });
-      items.push(
-        service.serializeTask(row as service.TaskRow, {
-          assignee: assignee ? { id: toPublicId('user', assignee.id), email: assignee.email } : null,
-          commentCount,
-        }),
-      );
-    }
-
-    res.json({ items, total: rows.length, limit, offset });
+    res.json({ items, total: items.length, limit, offset });
   } catch (err) {
     next(err);
   }
@@ -63,9 +48,7 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
   try {
     const taskId = parsePublicId(req.params.taskId, 'task');
     if (taskId === null) throw notFound('Task not found');
-    const task = await db.task.findUnique({ where: { id: taskId } });
-    if (!task) throw notFound('Task not found');
-    res.json(service.serializeTask(task, { tags: await service.listTags(taskId) }));
+    res.json(await service.getTask(taskId));
   } catch (err) {
     next(err);
   }
@@ -118,20 +101,7 @@ export async function history(req: Request, res: Response, next: NextFunction): 
   try {
     const taskId = parsePublicId(req.params.taskId, 'task');
     if (taskId === null) throw notFound('Task not found');
-    const rows = await db.taskHistory.findMany({
-      where: { taskId },
-      orderBy: { id: 'asc' },
-    });
-    res.json(
-      rows.map((r) => ({
-        id: r.id,
-        taskId: toPublicId('task', r.taskId),
-        changedBy: toPublicId('user', r.changedById),
-        fromStatus: r.fromStatus,
-        toStatus: r.toStatus,
-        changedAt: r.changedAt.toISOString(),
-      })),
-    );
+    res.json(await service.listHistory(taskId));
   } catch (err) {
     next(err);
   }
