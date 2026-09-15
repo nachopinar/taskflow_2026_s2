@@ -1,17 +1,19 @@
 import { FormEvent, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, ApiError } from '../lib/api';
+import { api } from '../lib/api';
+import { useAsyncAction } from '../lib/asyncAction';
 import { useAuth } from '../lib/auth';
 import { useProject } from '../lib/project';
 import { useMembers } from '../lib/members';
 import { EmptyState, ErrorMessage, Loading } from '../lib/ui';
-import type { Member } from '../types';
+import { OWNER } from '../types';
+import type { Member, Role } from '../types';
 
 interface AddMemberResponse {
   projectId: string;
   userId: string;
   email: string;
-  role: string;
+  role: Role;
 }
 
 export default function MembersPage() {
@@ -21,40 +23,30 @@ export default function MembersPage() {
   const { members, addMember, removeMember } = useMembers(project);
 
   const [email, setEmail] = useState('');
-  const [formError, setFormError] = useState<string | null>(null);
-  const [rowError, setRowError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const add = useAsyncAction();
+  const remove = useAsyncAction();
 
   const isOwner = !!project && !!user && project.ownerId === user.id;
 
   async function onAdd(e: FormEvent) {
     e.preventDefault();
     if (!project) return;
-    setFormError(null);
-    setSubmitting(true);
-    try {
+    await add.run(async () => {
       const res = await api<AddMemberResponse>(`/projects/${project.id}/members`, {
         method: 'POST',
         body: { email },
       });
       addMember({ userId: res.userId, email: res.email, role: res.role });
       setEmail('');
-    } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'No se pudo agregar el miembro');
-    } finally {
-      setSubmitting(false);
-    }
+    }, 'No se pudo agregar el miembro');
   }
 
   async function onRemove(member: Member) {
     if (!project) return;
-    setRowError(null);
-    try {
+    await remove.run(async () => {
       await api(`/projects/${project.id}/members/${member.userId}`, { method: 'DELETE' });
       removeMember(member.userId);
-    } catch (err) {
-      setRowError(err instanceof ApiError ? err.message : 'No se pudo quitar el miembro');
-    }
+    }, 'No se pudo quitar el miembro');
   }
 
   if (loading) return <Loading label="Cargando proyecto…" />;
@@ -81,7 +73,7 @@ export default function MembersPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
           </label>
-          <button type="submit" data-testid="member-add-button" disabled={submitting}>
+          <button type="submit" data-testid="member-add-button" disabled={add.busy}>
             Agregar miembro
           </button>
         </form>
@@ -90,8 +82,8 @@ export default function MembersPage() {
           Solo el owner puede administrar los miembros.
         </p>
       )}
-      <ErrorMessage message={formError} />
-      <ErrorMessage message={rowError} />
+      <ErrorMessage message={add.error} />
+      <ErrorMessage message={remove.error} />
 
       <ul className="list" data-testid="member-list">
         {members.map((member) => (
@@ -100,7 +92,7 @@ export default function MembersPage() {
               {member.email || member.userId}
             </span>
             <span className="card-meta" data-testid="member-item-role">
-              {member.userId === project.ownerId ? 'OWNER' : member.role}
+              {member.userId === project.ownerId ? OWNER : member.role}
             </span>
             {isOwner && member.userId !== project.ownerId && (
               <button

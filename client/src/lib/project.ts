@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError } from './api';
+import { api, errorText } from './api';
 import type { Project } from '../types';
 
 interface ProjectState {
@@ -24,7 +24,7 @@ export function useProject(projectId: string | undefined): ProjectState {
       setProject(found);
       if (!found) setError('No se encontró el proyecto');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo cargar el proyecto');
+      setError(errorText(err, 'No se pudo cargar el proyecto'));
     } finally {
       setLoading(false);
     }
