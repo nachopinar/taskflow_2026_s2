@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { errorText } from '../lib/api';
+import { useAsyncAction } from '../lib/asyncAction';
 import { ErrorMessage } from '../lib/ui';
 
 type Mode = 'login' | 'register';
@@ -13,25 +13,18 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { run, busy: submitting, error, setError } = useAsyncAction();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
+    await run(async () => {
       if (mode === 'login') {
         await login(email, password);
       } else {
         await register(email, password, name);
       }
       navigate('/projects', { replace: true });
-    } catch (err) {
-      setError(errorText(err, 'No se pudo completar la operación'));
-    } finally {
-      setSubmitting(false);
-    }
+    }, 'No se pudo completar la operación');
   }
 
   return (

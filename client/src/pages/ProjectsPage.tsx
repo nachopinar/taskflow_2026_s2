@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, errorText } from '../lib/api';
+import { useAsyncAction } from '../lib/asyncAction';
 import { EmptyState, ErrorMessage, Loading } from '../lib/ui';
 import type { Project } from '../types';
 
@@ -10,8 +11,7 @@ export default function ProjectsPage() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const create = useAsyncAction();
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -30,20 +30,14 @@ export default function ProjectsPage() {
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
-    setFormError(null);
-    setSubmitting(true);
-    try {
+    await create.run(async () => {
       const body: Record<string, unknown> = { name };
       if (description) body.description = description;
       await api<Project>('/projects', { method: 'POST', body });
       setName('');
       setDescription('');
       await load();
-    } catch (err) {
-      setFormError(errorText(err, 'No se pudo crear el proyecto'));
-    } finally {
-      setSubmitting(false);
-    }
+    }, 'No se pudo crear el proyecto');
   }
 
   return (
@@ -69,11 +63,11 @@ export default function ProjectsPage() {
             onChange={(e) => setDescription(e.target.value)}
           />
         </label>
-        <button type="submit" data-testid="project-create-submit" disabled={submitting}>
+        <button type="submit" data-testid="project-create-submit" disabled={create.busy}>
           Crear proyecto
         </button>
       </form>
-      <ErrorMessage message={formError} />
+      <ErrorMessage message={create.error} />
 
       {projects === null ? (
         <Loading label="Cargando proyectos…" />
