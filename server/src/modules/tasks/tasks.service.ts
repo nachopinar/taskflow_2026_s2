@@ -72,15 +72,7 @@ export async function createTask(projectId: number, userId: number, body: Record
   const description = assertOptionalString(body.description, 'description', 500);
   const priority = body.priority === undefined ? 'MEDIUM' : assertPriority(body.priority);
 
-  let assigneeId: number | null = null;
-  if (body.assigneeId !== undefined && body.assigneeId !== null) {
-    const parsed = parsePublicId(body.assigneeId, 'user');
-    if (parsed === null) throw badRequest('assigneeId must be a valid user id');
-    if (!(await isMember(parsed, projectId))) {
-      throw badRequest('The assignee must be a member of the project');
-    }
-    assigneeId = parsed;
-  }
+  const assigneeId = (await resolveAssigneeId(body.assigneeId, projectId)) ?? null;
 
   const dueDate = body.dueDate === undefined ? undefined : parseDueDate(body.dueDate);
   if (dueDate === undefined && body.dueDate !== undefined) {
@@ -107,81 +99,69 @@ export async function createTask(projectId: number, userId: number, body: Record
   return serializeTask(task);
 }
 
-/**
- * Actualiza una tarea: valida los campos recibidos, aplica las reglas de
- * autorización, resuelve la transición de estado, escribe el historial y
- * devuelve la tarea serializada.
- */
+async function isProjectAdmin(userId: number, projectId: number): Promise<boolean> {
+  const membership = await repo.findMembership(projectId, userId);
+  return membership !== null && (membership.role === OWNER || membership.role === ADMIN);
+}
+
+async function resolveAssigneeId(
+  value: unknown,
+  projectId: number,
+): Promise<number | null | undefined> {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const parsed = parsePublicId(value, 'user');
+  if (parsed === null) throw badRequest('assigneeId must be a valid user id');
+  if (!(await isMember(parsed, projectId))) {
+    throw badRequest('The assignee must be a member of the project');
+  }
+  return parsed;
+}
+
+async function resolveStatusChange(
+  value: unknown,
+  task: TaskRow,
+  userId: number,
+): Promise<Status | null> {
+  if (value === undefined) return null;
+  const requested = assertStatus(value);
+  if (requested === task.status) return null;
+  const isAssignee = task.assigneeId === userId;
+  if (!isAssignee && !(await isProjectAdmin(userId, task.projectId))) {
+    throw forbidden('Only the assignee or a project admin can change the status');
+  }
+  assertTransition(toStatus(task.status), requested);
+  return requested;
+}
+
 export async function updateTask(taskId: number, userId: number, body: Record<string, unknown>) {
   const task = await repo.findById(taskId);
   if (!task) throw notFound('Task not found');
 
   const data: Record<string, unknown> = {};
-  let nextStatus: Status | null = null;
 
   if (body.title !== undefined) {
     data.title = assertString(body.title, 'title', 3, 200);
   }
-
   if (body.description !== undefined) {
-    const description = assertOptionalString(body.description, 'description', 500);
-    data.description = description ?? null;
+    data.description = assertOptionalString(body.description, 'description', 500) ?? null;
   }
-
   if (body.priority !== undefined) {
     data.priority = assertPriority(body.priority);
   }
-
   if (body.dueDate !== undefined) {
-    const parsed = parseDueDate(body.dueDate);
-    if (parsed === undefined) {
+    const dueDate = parseDueDate(body.dueDate);
+    if (dueDate === undefined) {
       throw badRequest('dueDate must be a calendar date in YYYY-MM-DD format');
     }
-    data.dueDate = parsed;
+    data.dueDate = dueDate;
   }
 
-  if (body.assigneeId !== undefined) {
-    if (body.assigneeId === null) {
-      data.assigneeId = null;
-    } else {
-      const parsed = parsePublicId(body.assigneeId, 'user');
-      if (parsed === null) {
-        throw badRequest('assigneeId must be a valid user id');
-      } else {
-        const memberOfProject = await isMember(parsed, task.projectId);
-        if (!memberOfProject) {
-          throw badRequest('The assignee must be a member of the project');
-        } else {
-          data.assigneeId = parsed;
-        }
-      }
-    }
-  }
+  const assigneeId = await resolveAssigneeId(body.assigneeId, task.projectId);
+  if (assigneeId !== undefined) data.assigneeId = assigneeId;
 
-  if (body.status !== undefined) {
-    const requested = assertStatus(body.status);
-    if (requested !== task.status) {
-      const isAssignee = task.assigneeId === userId;
-      if (!isAssignee) {
-        const membership = await repo.findMembership(task.projectId, userId);
-        if (!membership) {
-          throw forbidden('Only the assignee or a project admin can change the status');
-        } else if (membership.role !== OWNER && membership.role !== ADMIN) {
-          throw forbidden('Only the assignee or a project admin can change the status');
-        } else {
-          assertTransition(toStatus(task.status), requested);
-          nextStatus = requested;
-        }
-      } else {
-        assertTransition(toStatus(task.status), requested);
-        nextStatus = requested;
-      }
-    }
-  }
-
-  if (nextStatus !== null) {
-    data.status = nextStatus;
-  }
+  const nextStatus = await resolveStatusChange(body.status, task, userId);
+  if (nextStatus !== null) data.status = nextStatus;
 
   if (Object.keys(data).length === 0) {
     return serializeTask(task);

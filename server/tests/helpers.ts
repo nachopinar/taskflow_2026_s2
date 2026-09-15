@@ -24,3 +24,16 @@ export async function createTask(token: string, projectId: string, body: Record<
     .send(body);
   return res.body;
 }
+
+export async function addMember(ownerToken: string, projectId: string, email: string) {
+  const res = await request(app)
+    .post(`/api/projects/${projectId}/members`)
+    .set(auth(ownerToken))
+    .send({ email });
+  return res.body;
+}
+
+export async function setStatus(token: string, taskId: string, status: string) {
+  const res = await request(app).patch(`/api/tasks/${taskId}`).set(auth(token)).send({ status });
+  return res.body;
+}
