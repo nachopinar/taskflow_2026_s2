@@ -1,3 +1,5 @@
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
+
 export type ErrorCode =
   | 'VALIDATION_ERROR'
   | 'UNAUTHORIZED'
@@ -36,3 +38,11 @@ export const forbidden = (m = 'You do not have access to this resource') => new 
 export const notFound = (m = 'Resource not found') => new ApiError('NOT_FOUND', m);
 export const conflict = (m: string) => new ApiError('CONFLICT', m);
 export const invalidTransition = (m: string) => new ApiError('INVALID_TRANSITION', m);
+
+export function asyncHandler(
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>,
+): RequestHandler {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}

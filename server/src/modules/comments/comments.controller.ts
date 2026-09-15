@@ -1,35 +1,19 @@
-import { NextFunction, Request, Response } from 'express';
-import { notFound } from '../../lib/http';
-import { parsePublicId } from '../../lib/ids';
+import { asyncHandler } from '../../lib/http';
+import { commentIdOf, taskIdOf } from '../../lib/params';
 import * as service from './comments.service';
 
-export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const taskId = parsePublicId(req.params.taskId, 'task');
-    if (taskId === null) throw notFound('Task not found');
-    res.json(await service.list(taskId));
-  } catch (err) {
-    next(err);
-  }
-}
+export const list = asyncHandler(async (req, res) => {
+  const taskId = taskIdOf(req);
+  res.json(await service.list(taskId));
+});
 
-export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const taskId = parsePublicId(req.params.taskId, 'task');
-    if (taskId === null) throw notFound('Task not found');
-    res.status(201).json(await service.create(taskId, req.user!.userId, req.body ?? {}));
-  } catch (err) {
-    next(err);
-  }
-}
+export const create = asyncHandler(async (req, res) => {
+  const taskId = taskIdOf(req);
+  res.status(201).json(await service.create(taskId, req.user!.userId, req.body ?? {}));
+});
 
-export async function remove(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const commentId = parsePublicId(req.params.commentId, 'comment');
-    if (commentId === null) throw notFound('Comment not found');
-    await service.remove(commentId, req.user!.userId);
-    res.status(204).send();
-  } catch (err) {
-    next(err);
-  }
-}
+export const remove = asyncHandler(async (req, res) => {
+  const commentId = commentIdOf(req);
+  await service.remove(commentId, req.user!.userId);
+  res.status(204).send();
+});
