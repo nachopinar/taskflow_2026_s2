@@ -1,6 +1,5 @@
-import { NextFunction, Request, Response } from 'express';
 import { db } from '../lib/db';
-import { forbidden, notFound, unauthorized } from '../lib/http';
+import { asyncHandler, forbidden, notFound, unauthorized } from '../lib/http';
 import { parsePublicId } from '../lib/ids';
 
 export async function isMember(userId: number, projectId: number): Promise<boolean> {
@@ -20,58 +19,42 @@ export async function isOwner(userId: number, projectId: number): Promise<boolea
  * indicado en el parámetro de ruta :projectId.
  */
 export function requireProjectMember(paramName = 'projectId') {
-  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
-    try {
-      if (!req.user) {
-        next(unauthorized());
-        return;
-      }
-      const projectId = parsePublicId(req.params[paramName], 'proj');
-      if (projectId === null) {
-        next(notFound('Project not found'));
-        return;
-      }
-      const project = await db.project.findUnique({ where: { id: projectId } });
-      if (!project) {
-        next(notFound('Project not found'));
-        return;
-      }
-      if (!(await isMember(req.user.userId, projectId))) {
-        next(forbidden('You are not a member of this project'));
-        return;
-      }
-      next();
-    } catch (err) {
-      next(err);
+  return asyncHandler(async (req, _res, next) => {
+    if (!req.user) {
+      throw unauthorized();
     }
-  };
+    const projectId = parsePublicId(req.params[paramName], 'proj');
+    if (projectId === null) {
+      throw notFound('Project not found');
+    }
+    const project = await db.project.findUnique({ where: { id: projectId } });
+    if (!project) {
+      throw notFound('Project not found');
+    }
+    if (!(await isMember(req.user.userId, projectId))) {
+      throw forbidden('You are not a member of this project');
+    }
+    next();
+  });
 }
 
 /** Verifica membresía a partir de una tarea (:taskId). */
 export function requireTaskProjectMember(paramName = 'taskId') {
-  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
-    try {
-      if (!req.user) {
-        next(unauthorized());
-        return;
-      }
-      const taskId = parsePublicId(req.params[paramName], 'task');
-      if (taskId === null) {
-        next(notFound('Task not found'));
-        return;
-      }
-      const task = await db.task.findUnique({ where: { id: taskId } });
-      if (!task) {
-        next(notFound('Task not found'));
-        return;
-      }
-      if (!(await isMember(req.user.userId, task.projectId))) {
-        next(forbidden('You are not a member of this project'));
-        return;
-      }
-      next();
-    } catch (err) {
-      next(err);
+  return asyncHandler(async (req, _res, next) => {
+    if (!req.user) {
+      throw unauthorized();
     }
-  };
+    const taskId = parsePublicId(req.params[paramName], 'task');
+    if (taskId === null) {
+      throw notFound('Task not found');
+    }
+    const task = await db.task.findUnique({ where: { id: taskId } });
+    if (!task) {
+      throw notFound('Task not found');
+    }
+    if (!(await isMember(req.user.userId, task.projectId))) {
+      throw forbidden('You are not a member of this project');
+    }
+    next();
+  });
 }

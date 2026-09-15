@@ -1,17 +1,13 @@
-import { NextFunction, Request, Response } from 'express';
+import { asyncHandler } from '../../lib/http';
 import * as service from './auth.service';
 
 function handle(
   fn: (body: Record<string, unknown>) => Promise<unknown>,
   status: number,
 ) {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      res.status(status).json(await fn(req.body ?? {}));
-    } catch (err) {
-      next(err);
-    }
-  };
+  return asyncHandler(async (req, res) => {
+    res.status(status).json(await fn(req.body ?? {}));
+  });
 }
 
 export const register = handle(service.register, 201);
