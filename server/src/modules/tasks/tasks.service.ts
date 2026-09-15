@@ -1,4 +1,3 @@
-import { db } from '../../lib/db';
 import { badRequest, forbidden, notFound } from '../../lib/http';
 import { formatDueDate, parseDueDate, parsePublicId, toPublicId } from '../../lib/ids';
 import {
@@ -9,6 +8,7 @@ import {
   Status,
 } from '../../lib/validation';
 import { isMember } from '../../middleware/membership';
+import * as repo from './tasks.repository';
 import { assertTransition } from './transitions';
 
 export interface TaskRow {
@@ -40,6 +40,30 @@ export function serializeTask(t: TaskRow, extra: Record<string, unknown> = {}) {
   };
 }
 
+export async function listTasks(projectId: number, filters: repo.TaskFilters) {
+  const rows = await repo.findTasks(projectId, filters);
+
+  const items = [];
+  for (const row of rows) {
+    const assignee = row.assigneeId ? await repo.findUserById(row.assigneeId) : null;
+    const commentCount = await repo.countComments(row.id);
+    items.push(
+      serializeTask(row as TaskRow, {
+        assignee: assignee ? { id: toPublicId('user', assignee.id), email: assignee.email } : null,
+        commentCount,
+      }),
+    );
+  }
+
+  return items;
+}
+
+export async function getTask(taskId: number) {
+  const task = await repo.findById(taskId);
+  if (!task) throw notFound('Task not found');
+  return serializeTask(task, { tags: await listTags(taskId) });
+}
+
 export async function createTask(projectId: number, userId: number, body: Record<string, unknown>) {
   const title = assertString(body.title, 'title', 3, 200);
   const description = assertOptionalString(body.description, 'description', 500);
@@ -60,20 +84,21 @@ export async function createTask(projectId: number, userId: number, body: Record
     throw badRequest('dueDate must be a calendar date in YYYY-MM-DD format');
   }
 
-  const task = await db.task.create({
-    data: {
-      ...(body as object),
-      projectId,
-      title,
-      description: description ?? null,
-      priority,
-      assigneeId,
-      dueDate: dueDate ?? null,
-    } as never,
-  });
+  const task = await repo.insert({
+    ...(body as object),
+    projectId,
+    title,
+    description: description ?? null,
+    priority,
+    assigneeId,
+    dueDate: dueDate ?? null,
+  } as never);
 
-  await db.taskHistory.create({
-    data: { taskId: task.id, changedById: userId, fromStatus: null, toStatus: task.status },
+  await repo.insertHistory({
+    taskId: task.id,
+    changedById: userId,
+    fromStatus: null,
+    toStatus: task.status,
   });
 
   return serializeTask(task);
@@ -85,7 +110,7 @@ export async function createTask(projectId: number, userId: number, body: Record
  * devuelve la tarea serializada.
  */
 export async function updateTask(taskId: number, userId: number, body: Record<string, unknown>) {
-  const task = await db.task.findUnique({ where: { id: taskId } });
+  const task = await repo.findById(taskId);
   if (!task) throw notFound('Task not found');
 
   const data: Record<string, unknown> = {};
@@ -135,9 +160,7 @@ export async function updateTask(taskId: number, userId: number, body: Record<st
     if (requested !== task.status) {
       const isAssignee = task.assigneeId === userId;
       if (!isAssignee) {
-        const membership = await db.projectMember.findUnique({
-          where: { projectId_userId: { projectId: task.projectId, userId } },
-        });
+        const membership = await repo.findMembership(task.projectId, userId);
         if (!membership) {
           throw forbidden('Only the assignee or a project admin can change the status');
         } else if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
@@ -161,16 +184,14 @@ export async function updateTask(taskId: number, userId: number, body: Record<st
     return serializeTask(task);
   }
 
-  const updated = await db.task.update({ where: { id: taskId }, data });
+  const updated = await repo.updateById(taskId, data);
 
   if (nextStatus !== null) {
-    await db.taskHistory.create({
-      data: {
-        taskId,
-        changedById: userId,
-        fromStatus: task.status,
-        toStatus: nextStatus,
-      },
+    await repo.insertHistory({
+      taskId,
+      changedById: userId,
+      fromStatus: task.status,
+      toStatus: nextStatus,
     });
   }
 
@@ -178,13 +199,10 @@ export async function updateTask(taskId: number, userId: number, body: Record<st
 }
 
 export async function deleteTask(taskId: number): Promise<void> {
-  const task = await db.task.findUnique({ where: { id: taskId } });
+  const task = await repo.findById(taskId);
   if (!task) throw notFound('Task not found');
 
-  await db.comment.deleteMany({ where: { taskId } });
-  await db.taskHistory.deleteMany({ where: { taskId } });
-  await db.taskTag.deleteMany({ where: { taskId } });
-  await db.task.delete({ where: { id: taskId } });
+  await repo.removeWithRelations(taskId);
 }
 
 const MAX_TAGS_PER_TASK = 10;
@@ -195,26 +213,38 @@ export async function addTag(taskId: number, rawName: unknown) {
   }
   const name = rawName.trim();
 
-  const current = await db.taskTag.count({ where: { taskId } });
+  const current = await repo.countTags(taskId);
   if (current >= MAX_TAGS_PER_TASK) {
     throw badRequest(`A task can have at most ${MAX_TAGS_PER_TASK} tags`);
   }
 
-  let tag = await db.tag.findFirst({ where: { name } });
-  if (!tag) tag = await db.tag.create({ data: { name } });
+  let tag = await repo.findTagByName(name);
+  if (!tag) tag = await repo.insertTag(name);
 
-  await db.taskTag.create({ data: { taskId, tagId: tag.id } });
+  await repo.insertTaskTag(taskId, tag.id);
 
   return { id: toPublicId('tag', tag.id), name: tag.name };
 }
 
 export async function removeTag(taskId: number, tagId: number): Promise<void> {
-  const link = await db.taskTag.findFirst({ where: { taskId, tagId } });
+  const link = await repo.findTaskTag(taskId, tagId);
   if (!link) throw notFound('The task does not have that tag');
-  await db.taskTag.delete({ where: { id: link.id } });
+  await repo.removeTaskTagById(link.id);
 }
 
 export async function listTags(taskId: number) {
-  const links = await db.taskTag.findMany({ where: { taskId }, include: { tag: true } });
+  const links = await repo.listTaskTags(taskId);
   return links.map((l) => ({ id: toPublicId('tag', l.tag.id), name: l.tag.name }));
+}
+
+export async function listHistory(taskId: number) {
+  const rows = await repo.listHistory(taskId);
+  return rows.map((r) => ({
+    id: r.id,
+    taskId: toPublicId('task', r.taskId),
+    changedBy: toPublicId('user', r.changedById),
+    fromStatus: r.fromStatus,
+    toStatus: r.toStatus,
+    changedAt: r.changedAt.toISOString(),
+  }));
 }

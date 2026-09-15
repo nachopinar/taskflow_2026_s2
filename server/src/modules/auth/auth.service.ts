@@ -1,10 +1,10 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { db } from '../../lib/db';
 import { badRequest, conflict, notFound, unauthorized } from '../../lib/http';
 import { toPublicId } from '../../lib/ids';
 import { assertPassword, normalizeEmail } from '../../lib/validation';
 import { signToken } from '../../middleware/auth';
+import * as repo from './auth.repository';
 
 const EMAIL_PATTERN = /^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
@@ -41,12 +41,10 @@ export async function register(body: Record<string, unknown>) {
   const password = assertPassword(body.password);
   const name = typeof body.name === 'string' ? body.name.trim() : null;
 
-  const existing = await db.user.findUnique({ where: { email } });
+  const existing = await repo.findUserByEmail(email);
   if (existing) throw conflict('Email already registered');
 
-  const user = await db.user.create({
-    data: { email, passwordHash: await bcrypt.hash(password, 10), name },
-  });
+  const user = await repo.insertUser({ email, passwordHash: await bcrypt.hash(password, 10), name });
 
   return {
     user: serializeUser(user),
@@ -58,7 +56,7 @@ export async function login(body: Record<string, unknown>) {
   const email = typeof body.email === 'string' ? normalizeEmail(body.email) : '';
   const password = typeof body.password === 'string' ? body.password : '';
 
-  const user = await db.user.findUnique({ where: { email } });
+  const user = await repo.findUserByEmail(email);
   if (!user) throw unauthorized('Invalid credentials');
 
   if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
@@ -72,12 +70,12 @@ export async function login(body: Record<string, unknown>) {
     if (attempts >= 5) {
       data.lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
     }
-    await db.user.update({ where: { id: user.id }, data });
+    await repo.updateUser(user.id, data);
     throw unauthorized('Invalid credentials');
   }
 
   if (user.lockedUntil) {
-    await db.user.update({ where: { id: user.id }, data: { lockedUntil: null } });
+    await repo.updateUser(user.id, { lockedUntil: null });
   }
 
   return {
@@ -89,21 +87,16 @@ export async function login(body: Record<string, unknown>) {
 export async function forgotPassword(body: Record<string, unknown>) {
   const email = checkEmail(body.email);
 
-  const user = await db.user.findUnique({ where: { email } });
+  const user = await repo.findUserByEmail(email);
   if (!user) throw notFound('No account found for that email');
 
-  await db.passwordResetToken.updateMany({
-    where: { userId: user.id, usedAt: null },
-    data: { usedAt: new Date() },
-  });
+  await repo.invalidateResetTokens(user.id);
 
   const token = crypto.randomBytes(24).toString('hex');
-  await db.passwordResetToken.create({
-    data: {
-      userId: user.id,
-      token,
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-    },
+  await repo.insertResetToken({
+    userId: user.id,
+    token,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   });
 
   // No hay servicio de email en el proyecto: el token se devuelve en la respuesta.
@@ -114,16 +107,13 @@ export async function resetPassword(body: Record<string, unknown>) {
   const token = typeof body.token === 'string' ? body.token : '';
   const newPassword = assertPassword(body.newPassword);
 
-  const record = await db.passwordResetToken.findUnique({ where: { token } });
+  const record = await repo.findResetToken(token);
   if (!record) throw badRequest('Invalid or expired reset token');
 
-  await db.user.update({
-    where: { id: record.userId },
-    data: {
-      passwordHash: await bcrypt.hash(newPassword, 10),
-      failedAttempts: 0,
-      lockedUntil: null,
-    },
+  await repo.updateUser(record.userId, {
+    passwordHash: await bcrypt.hash(newPassword, 10),
+    failedAttempts: 0,
+    lockedUntil: null,
   });
 
   return { message: 'Password updated' };
