@@ -5,7 +5,10 @@ import {
   assertPriority,
   assertStatus,
   assertString,
+  ADMIN,
+  OWNER,
   Status,
+  toStatus,
 } from '../../lib/validation';
 import { isMember } from '../../middleware/membership';
 import * as repo from './tasks.repository';
@@ -163,14 +166,14 @@ export async function updateTask(taskId: number, userId: number, body: Record<st
         const membership = await repo.findMembership(task.projectId, userId);
         if (!membership) {
           throw forbidden('Only the assignee or a project admin can change the status');
-        } else if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
+        } else if (membership.role !== OWNER && membership.role !== ADMIN) {
           throw forbidden('Only the assignee or a project admin can change the status');
         } else {
-          assertTransition(task.status as Status, requested);
+          assertTransition(toStatus(task.status), requested);
           nextStatus = requested;
         }
       } else {
-        assertTransition(task.status as Status, requested);
+        assertTransition(toStatus(task.status), requested);
         nextStatus = requested;
       }
     }

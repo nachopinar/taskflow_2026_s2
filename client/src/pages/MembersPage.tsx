@@ -5,13 +5,14 @@ import { useAuth } from '../lib/auth';
 import { useProject } from '../lib/project';
 import { useMembers } from '../lib/members';
 import { EmptyState, ErrorMessage, Loading } from '../lib/ui';
-import type { Member } from '../types';
+import { OWNER } from '../types';
+import type { Member, Role } from '../types';
 
 interface AddMemberResponse {
   projectId: string;
   userId: string;
   email: string;
-  role: string;
+  role: Role;
 }
 
 export default function MembersPage() {
@@ -100,7 +101,7 @@ export default function MembersPage() {
               {member.email || member.userId}
             </span>
             <span className="card-meta" data-testid="member-item-role">
-              {member.userId === project.ownerId ? 'OWNER' : member.role}
+              {member.userId === project.ownerId ? OWNER : member.role}
             </span>
             {isOwner && member.userId !== project.ownerId && (
               <button

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api';
+import { MEMBER, OWNER } from '../types';
 import type { Member, Project, TaskListResponse } from '../types';
 
 function cacheKey(projectId: string): string {
@@ -32,7 +33,7 @@ function mergeMembers(base: Member[], incoming: Member[]): Member[] {
       byId.set(m.userId, {
         userId: m.userId,
         email: existing.email || m.email,
-        role: existing.role === 'OWNER' || m.role === 'OWNER' ? 'OWNER' : existing.role || m.role,
+        role: existing.role === OWNER || m.role === OWNER ? OWNER : existing.role || m.role,
       });
     }
   }
@@ -65,10 +66,10 @@ export function useMembers(project: Project | null) {
     const fromTasks: Member[] = [];
     for (const task of res.items) {
       if (task.assignee) {
-        fromTasks.push({ userId: task.assignee.id, email: task.assignee.email, role: 'MEMBER' });
+        fromTasks.push({ userId: task.assignee.id, email: task.assignee.email, role: MEMBER });
       }
     }
-    const ownerRow: Member = { userId: project.ownerId, email: '', role: 'OWNER' };
+    const ownerRow: Member = { userId: project.ownerId, email: '', role: OWNER };
     const merged = mergeMembers(readCache(project.id), mergeMembers([ownerRow], fromTasks));
     persist(merged);
   }, [project, persist]);

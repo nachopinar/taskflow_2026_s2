@@ -4,7 +4,7 @@ import { api, ApiError } from '../lib/api';
 import { useProject } from '../lib/project';
 import { useMembers } from '../lib/members';
 import { ErrorMessage, Loading } from '../lib/ui';
-import { PRIORITIES, STATUSES, STATUS_LABELS, Task, TaskListResponse } from '../types';
+import { isStatus, PRIORITIES, STATUSES, STATUS_LABELS, Task, TaskListResponse } from '../types';
 
 interface Filters {
   priority: string;
@@ -293,7 +293,7 @@ export default function BoardPage() {
                             {s}
                           </option>
                         ))}
-                        {!STATUSES.includes(task.status as (typeof STATUSES)[number]) && (
+                        {!isStatus(task.status) && (
                           <option value={task.status}>{task.status}</option>
                         )}
                       </select>
