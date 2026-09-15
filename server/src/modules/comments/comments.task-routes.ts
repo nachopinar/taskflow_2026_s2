@@ -5,7 +5,7 @@ import * as controller from './comments.controller';
 // Montado en /tasks/:taskId/comments
 const router = Router({ mergeParams: true });
 
-router.use(requireTaskProjectMember('taskId'));
+router.use(requireTaskProjectMember());
 
 router.get('/', controller.list);
 router.post('/', controller.create);

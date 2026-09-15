@@ -1,5 +1,6 @@
 import { asyncHandler, notFound } from '../../lib/http';
 import { parsePublicId } from '../../lib/ids';
+import { projectIdOf, taskIdOf } from '../../lib/params';
 import * as repo from './tasks.repository';
 import * as service from './tasks.service';
 
@@ -7,8 +8,7 @@ const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
 export const listByProject = asyncHandler(async (req, res) => {
-  const projectId = parsePublicId(req.params.projectId, 'proj');
-  if (projectId === null) throw notFound('Project not found');
+  const projectId = projectIdOf(req);
 
   const assignedTo = req.query.assignedTo
     ? parsePublicId(String(req.query.assignedTo), 'user') ?? undefined
@@ -30,46 +30,40 @@ export const listByProject = asyncHandler(async (req, res) => {
 });
 
 export const create = asyncHandler(async (req, res) => {
-  const projectId = parsePublicId(req.params.projectId, 'proj');
-  if (projectId === null) throw notFound('Project not found');
+  const projectId = projectIdOf(req);
   res.status(201).json(await service.createTask(projectId, req.user!.userId, req.body ?? {}));
 });
 
 export const getOne = asyncHandler(async (req, res) => {
-  const taskId = parsePublicId(req.params.taskId, 'task');
-  if (taskId === null) throw notFound('Task not found');
+  const taskId = taskIdOf(req);
   res.json(await service.getTask(taskId));
 });
 
 export const update = asyncHandler(async (req, res) => {
-  const taskId = parsePublicId(req.params.taskId, 'task');
-  if (taskId === null) throw notFound('Task not found');
+  const taskId = taskIdOf(req);
   res.json(await service.updateTask(taskId, req.user!.userId, req.body ?? {}));
 });
 
 export const remove = asyncHandler(async (req, res) => {
-  const taskId = parsePublicId(req.params.taskId, 'task');
-  if (taskId === null) throw notFound('Task not found');
+  const taskId = taskIdOf(req);
   await service.deleteTask(taskId);
   res.status(204).send();
 });
 
 export const addTag = asyncHandler(async (req, res) => {
-  const taskId = parsePublicId(req.params.taskId, 'task');
-  if (taskId === null) throw notFound('Task not found');
+  const taskId = taskIdOf(req);
   res.status(201).json(await service.addTag(taskId, req.body?.name));
 });
 
 export const removeTag = asyncHandler(async (req, res) => {
-  const taskId = parsePublicId(req.params.taskId, 'task');
+  const taskId = taskIdOf(req);
   const tagId = parsePublicId(req.params.tagId, 'tag');
-  if (taskId === null || tagId === null) throw notFound('Task not found');
+  if (tagId === null) throw notFound('Task not found');
   await service.removeTag(taskId, tagId);
   res.status(204).send();
 });
 
 export const history = asyncHandler(async (req, res) => {
-  const taskId = parsePublicId(req.params.taskId, 'task');
-  if (taskId === null) throw notFound('Task not found');
+  const taskId = taskIdOf(req);
   res.json(await service.listHistory(taskId));
 });

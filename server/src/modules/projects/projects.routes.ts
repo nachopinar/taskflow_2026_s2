@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { idParam } from '../../lib/params';
 import { authenticate } from '../../middleware/auth';
 import * as controller from './projects.controller';
 import tasksRouter from '../tasks/tasks.project-routes';
@@ -6,6 +7,8 @@ import tasksRouter from '../tasks/tasks.project-routes';
 const router = Router();
 
 router.use(authenticate);
+
+router.param('projectId', idParam('proj', 'projectId', 'Project not found'));
 
 router.post('/', controller.create);
 router.get('/', controller.list);

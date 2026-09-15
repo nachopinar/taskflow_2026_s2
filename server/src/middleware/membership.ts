@@ -1,6 +1,6 @@
 import { db } from '../lib/db';
 import { asyncHandler, forbidden, notFound, unauthorized } from '../lib/http';
-import { parsePublicId } from '../lib/ids';
+import { projectIdOf, taskIdOf } from '../lib/params';
 
 export async function isMember(userId: number, projectId: number): Promise<boolean> {
   const membership = await db.projectMember.findUnique({
@@ -18,15 +18,12 @@ export async function isOwner(userId: number, projectId: number): Promise<boolea
  * Verifica que el usuario autenticado sea miembro vigente del proyecto
  * indicado en el parámetro de ruta :projectId.
  */
-export function requireProjectMember(paramName = 'projectId') {
+export function requireProjectMember() {
   return asyncHandler(async (req, _res, next) => {
     if (!req.user) {
       throw unauthorized();
     }
-    const projectId = parsePublicId(req.params[paramName], 'proj');
-    if (projectId === null) {
-      throw notFound('Project not found');
-    }
+    const projectId = projectIdOf(req);
     const project = await db.project.findUnique({ where: { id: projectId } });
     if (!project) {
       throw notFound('Project not found');
@@ -39,15 +36,12 @@ export function requireProjectMember(paramName = 'projectId') {
 }
 
 /** Verifica membresía a partir de una tarea (:taskId). */
-export function requireTaskProjectMember(paramName = 'taskId') {
+export function requireTaskProjectMember() {
   return asyncHandler(async (req, _res, next) => {
     if (!req.user) {
       throw unauthorized();
     }
-    const taskId = parsePublicId(req.params[paramName], 'task');
-    if (taskId === null) {
-      throw notFound('Task not found');
-    }
+    const taskId = taskIdOf(req);
     const task = await db.task.findUnique({ where: { id: taskId } });
     if (!task) {
       throw notFound('Task not found');

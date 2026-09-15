@@ -5,7 +5,7 @@ import * as controller from './tasks.controller';
 // Montado en /projects/:projectId/tasks
 const router = Router({ mergeParams: true });
 
-router.use(requireProjectMember('projectId'));
+router.use(requireProjectMember());
 
 router.get('/', controller.listByProject);
 router.post('/', controller.create);
