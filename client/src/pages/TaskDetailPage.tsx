@@ -4,14 +4,11 @@ import { api, errorText } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useProject } from '../lib/project';
 import { useMembers } from '../lib/members';
+import { toUpdateBody } from '../lib/taskBody';
 import { ErrorMessage, Loading } from '../lib/ui';
-import {
-  Comment,
-  HistoryEntry,
-  PRIORITIES,
-  STATUSES,
-  Task,
-} from '../types';
+import { StatusSelect } from '../components/task/selects';
+import TaskFields, { EMPTY_TASK_FIELDS, TaskFieldValues } from '../components/task/TaskFields';
+import { Comment, HistoryEntry, Task } from '../types';
 
 export default function TaskDetailPage() {
   const { projectId, taskId } = useParams();
@@ -24,11 +21,7 @@ export default function TaskDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('MEDIUM');
-  const [assigneeId, setAssigneeId] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [fields, setFields] = useState<TaskFieldValues>(EMPTY_TASK_FIELDS);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -47,11 +40,13 @@ export default function TaskDetailPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   const syncForm = useCallback((t: Task) => {
-    setTitle(t.title);
-    setDescription(t.description ?? '');
-    setPriority(t.priority);
-    setAssigneeId(t.assigneeId ?? '');
-    setDueDate(t.dueDate ?? '');
+    setFields({
+      title: t.title,
+      description: t.description ?? '',
+      priority: t.priority,
+      assigneeId: t.assigneeId ?? '',
+      dueDate: t.dueDate ?? '',
+    });
     setStatus(t.status);
   }, []);
 
@@ -104,13 +99,7 @@ export default function TaskDetailPage() {
     setSaveError(null);
     setSaving(true);
     try {
-      const body: Record<string, unknown> = {
-        title,
-        description: description === '' ? null : description,
-        priority,
-        assigneeId: assigneeId === '' ? null : assigneeId,
-        dueDate: dueDate === '' ? null : dueDate,
-      };
+      const body = toUpdateBody(fields);
       const updated = await api<Task>(`/tasks/${taskId}`, { method: 'PATCH', body });
       setTask(updated);
       syncForm(updated);
@@ -218,64 +207,14 @@ export default function TaskDetailPage() {
       </div>
 
       <form className="form" data-testid="task-edit-form" onSubmit={onSave}>
-        <label className="field">
-          <span>Título</span>
-          <input
-            type="text"
-            data-testid="task-title-input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>Descripción</span>
-          <textarea
-            data-testid="task-description-input"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>Prioridad</span>
-          <select
-            data-testid="task-priority-select"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Asignado</span>
-          <select
-            data-testid="task-assignee-select"
-            value={assigneeId}
-            onChange={(e) => setAssigneeId(e.target.value)}
-          >
-            <option value="">Sin asignar</option>
-            {members.map((m) => (
-              <option key={m.userId} value={m.userId}>
-                {m.email || m.userId}
-              </option>
-            ))}
-            {assigneeId && !members.some((m) => m.userId === assigneeId) && (
-              <option value={assigneeId}>{assigneeId}</option>
-            )}
-          </select>
-        </label>
-        <label className="field">
-          <span>Vencimiento</span>
-          <input
-            type="date"
-            data-testid="task-duedate-input"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-        </label>
+        <TaskFields
+          value={fields}
+          onChange={setFields}
+          members={members}
+          testIdPrefix="task"
+          descriptionAs="textarea"
+          includeUnknownAssignee
+        />
         <p className="field-value">
           Vencimiento actual:{' '}
           <span data-testid="task-duedate-value">{task.dueDate ?? '—'}</span>
@@ -294,17 +233,7 @@ export default function TaskDetailPage() {
       <form className="form form-inline" data-testid="task-status-form" onSubmit={onChangeStatus}>
         <label className="field">
           <span>Estado</span>
-          <select
-            data-testid="task-status-select"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <StatusSelect testId="task-status-select" value={status} onChange={setStatus} />
         </label>
         <button type="submit" data-testid="task-status-submit">
           Cambiar estado

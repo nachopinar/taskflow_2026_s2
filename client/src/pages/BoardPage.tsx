@@ -3,8 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import { api, errorText } from '../lib/api';
 import { useProject } from '../lib/project';
 import { useMembers } from '../lib/members';
+import { toCreateBody } from '../lib/taskBody';
 import { ErrorMessage, Loading } from '../lib/ui';
-import { isStatus, PRIORITIES, STATUSES, STATUS_LABELS, Task, TaskListResponse } from '../types';
+import { MemberSelect, PrioritySelect, StatusSelect } from '../components/task/selects';
+import TaskFields, { EMPTY_TASK_FIELDS, TaskFieldValues } from '../components/task/TaskFields';
+import { STATUSES, STATUS_LABELS, Task, TaskListResponse } from '../types';
 
 interface Filters {
   priority: string;
@@ -26,11 +29,7 @@ export default function BoardPage() {
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState('MEDIUM');
-  const [assigneeId, setAssigneeId] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [fields, setFields] = useState<TaskFieldValues>(EMPTY_TASK_FIELDS);
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -78,17 +77,9 @@ export default function BoardPage() {
     setCreateError(null);
     setCreating(true);
     try {
-      const body: Record<string, unknown> = { title };
-      if (description) body.description = description;
-      if (priority) body.priority = priority;
-      if (assigneeId) body.assigneeId = assigneeId;
-      if (dueDate) body.dueDate = dueDate;
+      const body = toCreateBody(fields);
       await api<Task>(`/projects/${projectId}/tasks`, { method: 'POST', body });
-      setTitle('');
-      setDescription('');
-      setPriority('MEDIUM');
-      setAssigneeId('');
-      setDueDate('');
+      setFields(EMPTY_TASK_FIELDS);
       await loadTasks();
     } catch (err) {
       setCreateError(errorText(err, 'No se pudo crear la tarea'));
@@ -127,62 +118,12 @@ export default function BoardPage() {
       </div>
 
       <form className="form form-inline" data-testid="task-create-form" onSubmit={onCreate}>
-        <label className="field">
-          <span>Título</span>
-          <input
-            type="text"
-            data-testid="task-create-title-input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>Descripción</span>
-          <input
-            type="text"
-            data-testid="task-create-description-input"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>Prioridad</span>
-          <select
-            data-testid="task-create-priority-select"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Asignado</span>
-          <select
-            data-testid="task-create-assignee-select"
-            value={assigneeId}
-            onChange={(e) => setAssigneeId(e.target.value)}
-          >
-            <option value="">Sin asignar</option>
-            {members.map((m) => (
-              <option key={m.userId} value={m.userId}>
-                {m.email || m.userId}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          <span>Vencimiento</span>
-          <input
-            type="date"
-            data-testid="task-create-duedate-input"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-        </label>
+        <TaskFields
+          value={fields}
+          onChange={setFields}
+          members={members}
+          testIdPrefix="task-create"
+        />
         <button type="submit" data-testid="task-create-submit" disabled={creating}>
           Crear tarea
         </button>
@@ -192,33 +133,22 @@ export default function BoardPage() {
       <form className="form form-inline" data-testid="filter-form" onSubmit={applyFilters}>
         <label className="field">
           <span>Prioridad</span>
-          <select
-            data-testid="filter-priority-select"
+          <PrioritySelect
+            testId="filter-priority-select"
             value={draftFilters.priority}
-            onChange={(e) => setDraftFilters({ ...draftFilters, priority: e.target.value })}
-          >
-            <option value="">Todas</option>
-            {PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+            onChange={(priority) => setDraftFilters({ ...draftFilters, priority })}
+            emptyOption="Todas"
+          />
         </label>
         <label className="field">
           <span>Asignado</span>
-          <select
-            data-testid="filter-assignee-select"
+          <MemberSelect
+            testId="filter-assignee-select"
             value={draftFilters.assignedTo}
-            onChange={(e) => setDraftFilters({ ...draftFilters, assignedTo: e.target.value })}
-          >
-            <option value="">Todos</option>
-            {members.map((m) => (
-              <option key={m.userId} value={m.userId}>
-                {m.email || m.userId}
-              </option>
-            ))}
-          </select>
+            onChange={(assignedTo) => setDraftFilters({ ...draftFilters, assignedTo })}
+            members={members}
+            emptyOption="Todos"
+          />
         </label>
         <label className="field">
           <span>Buscar</span>
@@ -283,20 +213,12 @@ export default function BoardPage() {
                     </div>
                     <label className="field">
                       <span>Estado</span>
-                      <select
-                        data-testid="task-card-status-select"
+                      <StatusSelect
+                        testId="task-card-status-select"
                         value={task.status}
-                        onChange={(e) => changeStatus(task, e.target.value)}
-                      >
-                        {STATUSES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                        {!isStatus(task.status) && (
-                          <option value={task.status}>{task.status}</option>
-                        )}
-                      </select>
+                        onChange={(status) => changeStatus(task, status)}
+                        includeUnknown
+                      />
                     </label>
                   </li>
                 ))}
