@@ -29,8 +29,8 @@ export interface Task {
   projectId: string;
   title: string;
   description: string | null;
-  status: string;
-  priority: string;
+  status: Status;
+  priority: Priority;
   assigneeId: string | null;
   dueDate: string | null;
   createdAt: string;
@@ -59,21 +59,35 @@ export interface HistoryEntry {
   id: number;
   taskId: string;
   changedBy: string;
-  fromStatus: string | null;
-  toStatus: string;
+  fromStatus: Status | null;
+  toStatus: Status;
   changedAt: string;
 }
 
 export interface Member {
   userId: string;
   email: string;
-  role: string;
+  role: Role;
 }
 
 export const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
 export const STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'] as const;
+export const ROLES = ['OWNER', 'ADMIN', 'MEMBER'] as const;
+export const [OWNER, ADMIN, MEMBER] = ROLES;
 
-export const STATUS_LABELS: Record<string, string> = {
+export type Priority = (typeof PRIORITIES)[number];
+export type Status = (typeof STATUSES)[number];
+export type Role = (typeof ROLES)[number];
+
+export function isStatus(value: string): value is Status {
+  return (STATUSES as readonly string[]).includes(value);
+}
+
+export function isPriority(value: string): value is Priority {
+  return (PRIORITIES as readonly string[]).includes(value);
+}
+
+export const STATUS_LABELS: Record<Status, string> = {
   TODO: 'Por hacer',
   IN_PROGRESS: 'En progreso',
   DONE: 'Hecho',

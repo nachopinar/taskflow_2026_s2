@@ -42,6 +42,10 @@ export class ApiError extends Error {
   }
 }
 
+export function errorText(err: unknown, fallback: string): string {
+  return err instanceof ApiError ? err.message : fallback;
+}
+
 interface RequestOptions {
   method?: string;
   body?: unknown;

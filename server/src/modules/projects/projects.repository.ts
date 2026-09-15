@@ -1,4 +1,5 @@
 import { db } from '../../lib/db';
+import type { Role } from '../../lib/validation';
 
 export function findById(id: number) {
   return db.project.findUnique({ where: { id } });
@@ -40,7 +41,7 @@ export function findMembership(projectId: number, userId: number) {
   });
 }
 
-export function insertMember(projectId: number, userId: number, role: string) {
+export function insertMember(projectId: number, userId: number, role: Role) {
   return db.projectMember.create({ data: { projectId, userId, role } });
 }
 

@@ -1,6 +1,6 @@
 import { badRequest, conflict, forbidden, notFound } from '../../lib/http';
 import { toPublicId } from '../../lib/ids';
-import { assertOptionalString } from '../../lib/validation';
+import { assertOptionalString, MEMBER, OWNER } from '../../lib/validation';
 import * as repo from './projects.repository';
 
 const EMAIL_CHECK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,7 +34,7 @@ export async function createProject(userId: number, body: Record<string, unknown
   if (duplicate) throw conflict('You already have a project with that name');
 
   const project = await repo.insert({ name, description: description ?? null, ownerId: userId });
-  await repo.insertMember(project.id, userId, 'OWNER');
+  await repo.insertMember(project.id, userId, OWNER);
 
   return serialize(project);
 }
@@ -98,12 +98,12 @@ export async function addMember(id: number, userId: number, body: Record<string,
   const existing = await repo.findMembership(id, user.id);
   if (existing) throw conflict('User is already a member of this project');
 
-  await repo.insertMember(id, user.id, 'MEMBER');
+  await repo.insertMember(id, user.id, MEMBER);
   return {
     projectId: toPublicId('proj', id),
     userId: toPublicId('user', user.id),
     email: user.email,
-    role: 'MEMBER',
+    role: MEMBER,
   };
 }
 

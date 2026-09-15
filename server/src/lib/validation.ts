@@ -69,3 +69,12 @@ export function assertStatus(value: unknown): Status {
   }
   return value as Status;
 }
+
+/** Estrecha un estado leído de la base (columna String) al tipo Status. */
+export function toStatus(value: string): Status {
+  return assertStatus(value);
+}
+
+export const ROLES = ['OWNER', 'ADMIN', 'MEMBER'] as const;
+export type Role = (typeof ROLES)[number];
+export const [OWNER, ADMIN, MEMBER] = ROLES;
