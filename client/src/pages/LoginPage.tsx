@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { ApiError } from '../lib/api';
+import { errorText } from '../lib/api';
 import { ErrorMessage } from '../lib/ui';
 
 type Mode = 'login' | 'register';
@@ -28,7 +28,7 @@ export default function LoginPage() {
       }
       navigate('/projects', { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo completar la operación');
+      setError(errorText(err, 'No se pudo completar la operación'));
     } finally {
       setSubmitting(false);
     }

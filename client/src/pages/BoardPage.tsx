@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, ApiError } from '../lib/api';
+import { api, errorText } from '../lib/api';
 import { useProject } from '../lib/project';
 import { useMembers } from '../lib/members';
 import { ErrorMessage, Loading } from '../lib/ui';
@@ -52,7 +52,7 @@ export default function BoardPage() {
       setData(res);
     } catch (err) {
       setData(null);
-      setListError(err instanceof ApiError ? err.message : 'No se pudieron cargar las tareas');
+      setListError(errorText(err, 'No se pudieron cargar las tareas'));
     } finally {
       setListLoading(false);
     }
@@ -91,7 +91,7 @@ export default function BoardPage() {
       setDueDate('');
       await loadTasks();
     } catch (err) {
-      setCreateError(err instanceof ApiError ? err.message : 'No se pudo crear la tarea');
+      setCreateError(errorText(err, 'No se pudo crear la tarea'));
     } finally {
       setCreating(false);
     }
@@ -103,7 +103,7 @@ export default function BoardPage() {
       await api<Task>(`/tasks/${task.id}`, { method: 'PATCH', body: { status } });
       await loadTasks();
     } catch (err) {
-      setListError(err instanceof ApiError ? err.message : 'No se pudo cambiar el estado');
+      setListError(errorText(err, 'No se pudo cambiar el estado'));
     }
   }
 

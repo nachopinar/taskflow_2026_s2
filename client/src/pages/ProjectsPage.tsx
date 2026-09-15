@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, ApiError } from '../lib/api';
+import { api, errorText } from '../lib/api';
 import { EmptyState, ErrorMessage, Loading } from '../lib/ui';
 import type { Project } from '../types';
 
@@ -20,7 +20,7 @@ export default function ProjectsPage() {
       setProjects(data);
     } catch (err) {
       setProjects([]);
-      setLoadError(err instanceof ApiError ? err.message : 'No se pudieron cargar los proyectos');
+      setLoadError(errorText(err, 'No se pudieron cargar los proyectos'));
     }
   }, []);
 
@@ -40,7 +40,7 @@ export default function ProjectsPage() {
       setDescription('');
       await load();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'No se pudo crear el proyecto');
+      setFormError(errorText(err, 'No se pudo crear el proyecto'));
     } finally {
       setSubmitting(false);
     }

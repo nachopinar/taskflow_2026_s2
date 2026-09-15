@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, ApiError } from '../lib/api';
+import { api, errorText } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useProject } from '../lib/project';
 import { useMembers } from '../lib/members';
@@ -41,7 +41,7 @@ export default function MembersPage() {
       addMember({ userId: res.userId, email: res.email, role: res.role });
       setEmail('');
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'No se pudo agregar el miembro');
+      setFormError(errorText(err, 'No se pudo agregar el miembro'));
     } finally {
       setSubmitting(false);
     }
@@ -54,7 +54,7 @@ export default function MembersPage() {
       await api(`/projects/${project.id}/members/${member.userId}`, { method: 'DELETE' });
       removeMember(member.userId);
     } catch (err) {
-      setRowError(err instanceof ApiError ? err.message : 'No se pudo quitar el miembro');
+      setRowError(errorText(err, 'No se pudo quitar el miembro'));
     }
   }
 

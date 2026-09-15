@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, ApiError } from '../lib/api';
+import { api, errorText } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useProject } from '../lib/project';
 import { useMembers } from '../lib/members';
@@ -64,7 +64,7 @@ export default function TaskDetailPage() {
       setTask(t);
       syncForm(t);
     } catch (err) {
-      setLoadError(err instanceof ApiError ? err.message : 'No se pudo cargar la tarea');
+      setLoadError(errorText(err, 'No se pudo cargar la tarea'));
     } finally {
       setLoading(false);
     }
@@ -78,9 +78,7 @@ export default function TaskDetailPage() {
       setComments(rows);
     } catch (err) {
       setComments([]);
-      setCommentsError(
-        err instanceof ApiError ? err.message : 'No se pudieron cargar los comentarios',
-      );
+      setCommentsError(errorText(err, 'No se pudieron cargar los comentarios'));
     }
   }, [taskId]);
 
@@ -117,7 +115,7 @@ export default function TaskDetailPage() {
       setTask(updated);
       syncForm(updated);
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : 'No se pudo guardar la tarea');
+      setSaveError(errorText(err, 'No se pudo guardar la tarea'));
     } finally {
       setSaving(false);
     }
@@ -136,7 +134,7 @@ export default function TaskDetailPage() {
       syncForm(updated);
       await loadHistory();
     } catch (err) {
-      setStatusError(err instanceof ApiError ? err.message : 'No se pudo cambiar el estado');
+      setStatusError(errorText(err, 'No se pudo cambiar el estado'));
     }
   }
 
@@ -149,7 +147,7 @@ export default function TaskDetailPage() {
       setTagName('');
       await loadTask();
     } catch (err) {
-      setTagError(err instanceof ApiError ? err.message : 'No se pudo agregar la etiqueta');
+      setTagError(errorText(err, 'No se pudo agregar la etiqueta'));
     }
   }
 
@@ -160,7 +158,7 @@ export default function TaskDetailPage() {
       await api(`/tasks/${taskId}/tags/${tagId}`, { method: 'DELETE' });
       await loadTask();
     } catch (err) {
-      setTagError(err instanceof ApiError ? err.message : 'No se pudo quitar la etiqueta');
+      setTagError(errorText(err, 'No se pudo quitar la etiqueta'));
     }
   }
 
@@ -174,7 +172,7 @@ export default function TaskDetailPage() {
       setCommentBody('');
       await loadComments();
     } catch (err) {
-      setCommentError(err instanceof ApiError ? err.message : 'No se pudo publicar el comentario');
+      setCommentError(errorText(err, 'No se pudo publicar el comentario'));
     } finally {
       setPostingComment(false);
     }
@@ -186,7 +184,7 @@ export default function TaskDetailPage() {
       await api(`/comments/${id}`, { method: 'DELETE' });
       await loadComments();
     } catch (err) {
-      setCommentError(err instanceof ApiError ? err.message : 'No se pudo borrar el comentario');
+      setCommentError(errorText(err, 'No se pudo borrar el comentario'));
     }
   }
 
@@ -197,7 +195,7 @@ export default function TaskDetailPage() {
       await api(`/tasks/${taskId}`, { method: 'DELETE' });
       navigate(`/projects/${projectId}`);
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : 'No se pudo borrar la tarea');
+      setSaveError(errorText(err, 'No se pudo borrar la tarea'));
     }
   }
 
