@@ -3,6 +3,12 @@ import { createApp } from '../src/app';
 
 export const app = createApp();
 
+export const ISO = expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/);
+
+export function apiError(code: string, message: string) {
+  return { error: { code, message, details: [] } };
+}
+
 export async function registerUser(email: string, password = 'Password1') {
   const res = await request(app).post('/api/auth/register').send({ email, password });
   return { token: res.body.token as string, id: res.body.user.id as string, res };

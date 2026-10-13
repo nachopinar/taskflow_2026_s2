@@ -7,5 +7,9 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   collectCoverageFrom: ['src/**/*.ts', '!src/index.ts', '!src/types/**'],
   coverageReporters: ['text', 'lcov'],
+  coverageThreshold: {
+    global: { lines: 70, branches: 60 },
+    './src/middleware/': { lines: 70, branches: 60 },
+  },
   testTimeout: 20000,
 };
