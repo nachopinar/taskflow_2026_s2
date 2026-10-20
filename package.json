@@ -15,6 +15,9 @@
     "test": "npm --prefix server test",
     "test:coverage": "npm --prefix server run test:coverage",
     "test:e2e": "npm --prefix e2e test",
+    "test:pact:consumer": "npm --prefix client run test:pact",
+    "test:pact:provider": "npm --prefix server run test:pact",
+    "test:pact": "npm run test:pact:consumer && npm run test:pact:provider",
     "lint": "npm --prefix server run lint",
     "postinstall": "npm --prefix server install && npm --prefix client install && npm --prefix e2e install"
   },
