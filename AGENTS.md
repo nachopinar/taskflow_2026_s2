@@ -39,6 +39,7 @@ Para verificar tipos sin compilar: `npx --prefix server tsc -p server/tsconfig.j
 - [ ] Compila sin errores de tipos en los paquetes que tocaste.
 - [ ] `npm test` no tiene **fallos nuevos**. Los fallos conocidos (los de `auth-findings.test.ts` listados en `docs/reporte-tests-fallidos.md`) se mantienen; cualquier otro fallo lo introdujiste vos.
 - [ ] Si tocaste `server/src/`, `npm run test:coverage` sigue pasando los umbrales.
+- [ ] No redefiniste tipos, constantes ni helpers que ya existían, y lo nuevo reutilizable quedó en su archivo compartido.
 - [ ] El diff tiene solo lo que pedía la tarea: nada de refactors, renombres ni formateo de código ajeno.
 - [ ] Si encontraste comportamiento raro o un bug, lo dijiste en tu respuesta.
 
@@ -51,10 +52,39 @@ Para verificar tipos sin compilar: `npx --prefix server tsc -p server/tsconfig.j
 - **Seguí el estilo del archivo que tocás** (comillas simples, punto y coma, 2 espacios, imports relativos). No reformatees lo que no cambiaste.
 - **Nombres claros, funciones cortas, guard clauses** antes que `if` anidados.
 - **Constantes con nombre** en lugar de números o strings mágicos. Ya existen constantes tipadas para estados, prioridades y roles (`server/src/lib/validation.ts`, `client/src/types.ts`): usalas.
-- **Reutilizá antes de escribir.** Buscá en `server/src/lib/`, `client/src/lib/` y `server/tests/helpers.ts` antes de crear un helper nuevo.
+- **Reutilizá tipos y helpers existentes.** Es obligatorio; ver [Tipos y helpers compartidos](#tipos-y-helpers-compartidos).
 - **Comentarios solo cuando explican un porqué** que no se lee en el código.
 - **No agregues dependencias** sin que te lo pidan. Si una hace falta, fijá la versión exacta (el repo no usa `^` ni `~`).
 - **Nunca** commitees `.env`, archivos `.db`, `coverage/` ni secretos.
+
+### Tipos y helpers compartidos
+
+**Antes de escribir un tipo, una constante o una función, buscá si ya existe** (`grep` en las carpetas de abajo). Si existe, usalo: no lo redefinas, no lo copies en tu archivo ni hagas una versión "parecida". Si existe pero no alcanza, extendelo en su archivo en lugar de crear otro.
+
+**Los tipos y helpers nuevos que se puedan reutilizar van en estos mismos archivos**, no en el archivo que los usa por primera vez. Si no encajan en ninguno, creá un archivo nuevo en la misma carpeta (`server/src/lib/`, `client/src/lib/`) con un nombre que diga qué contiene. Lo que es privado de un solo módulo puede quedar en ese módulo.
+
+| Qué | Dónde | Qué hay hoy |
+|---|---|---|
+| Errores HTTP (server) | `server/src/lib/http.ts` | `ErrorCode`, `ApiError`, `badRequest`, `unauthorized`, `forbidden`, `notFound`, `conflict`, `invalidTransition`, `asyncHandler` |
+| Ids públicos y fechas | `server/src/lib/ids.ts` | `Prefix`, `toPublicId`, `parsePublicId`, `parseDueDate`, `formatDueDate` |
+| Parámetros de ruta | `server/src/lib/params.ts` | `idParam`, `projectIdOf`, `taskIdOf`, `commentIdOf` |
+| Validación y dominio (server) | `server/src/lib/validation.ts` | `EMAIL_RE`, `normalizeEmail`, `assertEmail`, `assertPassword`, `assertString`, `assertOptionalString`, `PRIORITIES`/`Priority`/`assertPriority`, `STATUSES`/`Status`/`assertStatus`/`toStatus`, `ROLES`/`Role`/`OWNER`/`ADMIN`/`MEMBER` |
+| Auth y membresía | `server/src/middleware/` | `authenticate`, `signToken`, `TokenPayload`, `isMember`, `isOwner`, `requireProjectMember`, `requireTaskProjectMember` |
+| Acceso a datos | `server/src/lib/db.ts` + `*.repository.ts` | `db` (Prisma), una función de repositorio por consulta |
+| Tipos de la API (client) | `client/src/types.ts` | `User`, `Project`, `Task`, `TaskAssignee`, `Tag`, `TaskListResponse`, `Comment`, `HistoryEntry`, `Member`, `PRIORITIES`, `STATUSES`, `ROLES`, `Priority`, `Status`, `Role`, `isStatus`, `isPriority`, `STATUS_LABELS` |
+| HTTP y sesión (client) | `client/src/lib/api.ts` | `api`, `ApiError`, `errorText`, `getToken`/`setToken`/`clearToken`, `getStoredUser`/`setStoredUser` |
+| Hooks de datos (client) | `client/src/lib/` | `useAuth`, `useAsyncAction`, `useProject`, `useMembers`, `useTask`, `useTaskComments`, `useTaskHistory`, `toCreateBody`, `toUpdateBody` |
+| UI compartida (client) | `client/src/lib/ui.tsx`, `client/src/components/task/` | `Loading`, `ErrorMessage`, `EmptyState`, `PrioritySelect`, `StatusSelect`, `MemberSelect`, `TaskFields`, `TaskFieldValues`, `EMPTY_TASK_FIELDS` |
+| Helpers de tests de API | `server/tests/helpers.ts` | `app`, `ISO`, `apiError`, `auth`, `registerUser`, `createProject`, `createTask`, `addMember`, `setStatus` |
+| UI tests (cuando exista) | `e2e/` | fixtures, page objects, componentes y clientes de API: cada uno en su capa (ver ADR-001) |
+
+Reglas concretas:
+
+- **No uses literales donde ya hay constante o tipo:** nada de `'IN_PROGRESS'` suelto ni `string` donde corresponde `Status`, ni regex de email propia en lugar de `EMAIL_RE`.
+- **Server y client tienen tipos separados a propósito** (el client no importa de `server/`). Si cambiás la forma de una respuesta en el server, actualizá el tipo correspondiente en `client/src/types.ts`.
+- **En tests, si el mismo request o armado de estado aparece en dos archivos, va en `helpers.ts`** (o en un fixture/cliente de API en `e2e/`).
+- **Hay duplicaciones viejas en el código** (por ejemplo, `EMAIL_CHECK` en `projects.service.ts` repite `EMAIL_RE`). No las tomes como modelo y no las arregles salvo que te lo pidan; el código nuevo usa la versión compartida.
+- **Si agregás algo compartido, sumalo a esta tabla** en el mismo commit.
 
 ### Server (`server/src/`)
 
