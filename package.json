@@ -14,8 +14,9 @@
     "db:reset": "npm --prefix server run db:reset",
     "test": "npm --prefix server test",
     "test:coverage": "npm --prefix server run test:coverage",
+    "test:e2e": "npm --prefix e2e test",
     "lint": "npm --prefix server run lint",
-    "postinstall": "npm --prefix server install && npm --prefix client install"
+    "postinstall": "npm --prefix server install && npm --prefix client install && npm --prefix e2e install"
   },
   "devDependencies": {
     "concurrently": "9.1.0"
