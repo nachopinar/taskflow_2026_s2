@@ -80,6 +80,7 @@ El comando `db:setup` carga datos de ejemplo. Los tres usuarios comparten la con
 | `npm run db:reset` | Borra la base y la vuelve a crear desde cero |
 | `npm test` | Corre la suite de tests |
 | `npm run test:coverage` | Corre la suite con reporte de cobertura |
+| `npm run test:pact` | Corre los tests de contrato (consumidor y después proveedor) |
 
 ## Frontend
 
@@ -181,6 +182,19 @@ Los tests etiquetados `@known-bug` fallan a propósito: describen lo que pide la
 especificación y la app todavía no cumple. La selección de historias, la
 trazabilidad y el detalle de cada defecto están en
 [`docs/reporte-tests-e2e.md`](docs/reporte-tests-e2e.md).
+
+### Tests de contrato (Pact)
+
+Pact (`@pact-foundation/pact` 16.5.0) ya queda instalado con `npm install`. El cliente es el **consumidor** y la API el **proveedor**.
+
+| Lado | Dónde van los tests | Runner | Comando |
+|------|---------------------|--------|---------|
+| Consumidor | `client/tests/pact/**/*.pact.test.ts` | Vitest (`client/vitest.pact.config.ts`) | `npm run test:pact:consumer` |
+| Proveedor | `server/tests/pact/**/*.pact.test.ts` | Jest (`server/jest.pact.config.js`) | `npm run test:pact:provider` |
+
+- Los tests del consumidor escriben los contratos en `pacts/` (en la raíz); la verificación del proveedor los lee de ahí.
+- Los tests de `server/tests/pact/` no corren con `npm test`, solo con los comandos de Pact.
+- La verificación del proveedor reutiliza `globalSetup.ts` y `setup.ts`, así que corre contra su propia base SQLite.
 
 ## Estructura
 
