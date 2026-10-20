@@ -164,6 +164,24 @@ npm test
 
 Está lejos de ser exhaustiva — ampliarla es parte del trabajo del semestre.
 
+### Tests end-to-end (Playwright)
+
+La suite de UI vive en `e2e/` y sigue el [ADR-001](docs/0001-arquitectura-de-testing.md).
+Levanta sola su propia API (puerto 3100, base `server/prisma/e2e.db`) y el build
+del frontend (puerto 5174), así que no choca con `npm run dev`.
+
+```bash
+npm --prefix e2e run install:browsers   # una sola vez: descarga Chromium
+npm run test:e2e                        # toda la suite
+npm --prefix e2e run test:no-known-bugs # excluye los tests de defectos conocidos
+npm --prefix e2e run report             # abre el reporte HTML de la última corrida
+```
+
+Los tests etiquetados `@known-bug` fallan a propósito: describen lo que pide la
+especificación y la app todavía no cumple. La selección de historias, la
+trazabilidad y el detalle de cada defecto están en
+[`docs/reporte-tests-e2e.md`](docs/reporte-tests-e2e.md).
+
 ## Estructura
 
 ```
