@@ -1,0 +1,20 @@
+{
+  "name": "taskflow-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Suite end-to-end de TaskFlow con Playwright (ver docs/0001-arquitectura-de-testing.md).",
+  "scripts": {
+    "test": "playwright test",
+    "test:known-bugs": "playwright test --grep @known-bug",
+    "test:no-known-bugs": "playwright test --grep-invert @known-bug",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "20.19.9",
+    "typescript": "5.6.3"
+  }
+}
