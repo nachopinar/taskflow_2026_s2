@@ -1,6 +1,7 @@
 import { test as base, Page } from '@playwright/test';
+import type { Project, Task } from '@client/types';
 import { TaskflowApi } from '../api/TaskflowApi';
-import type { Account, Project } from '../api/types';
+import type { Account, NewTask } from '../api/types';
 import { env } from '../config/env';
 import { uniqueEmail, uniqueName } from '../data/factories';
 import { BoardPage } from '../pages/BoardPage';
@@ -17,8 +18,14 @@ interface Fixtures {
   createAccount: (alias?: string) => Promise<Account>;
   /** Usuario principal del test. El `page` arranca con su sesión iniciada. */
   owner: Account;
+  /** Cliente de la API autenticado como `owner`. */
+  ownerApi: TaskflowApi;
   /** Proyecto del `owner`, creado por API. */
   project: Project;
+  /** Usuario que ya es miembro (no owner) de `project`. */
+  member: Account;
+  /** Crea una tarea en `project` en nombre del `owner`. */
+  createTask: (task: NewTask) => Promise<Task>;
   /** Abre otra ventana con la sesión de `account`, para escenarios con dos usuarios. */
   openPageAs: (account: Account) => Promise<Page>;
   loginPage: LoginPage;
@@ -43,8 +50,22 @@ export const test = base.extend<Fixtures>({
     await use(await createAccount('owner'));
   },
 
-  project: async ({ api, owner }, use) => {
-    await use(await api.as(owner).createProject(uniqueName('Proyecto')));
+  ownerApi: async ({ api, owner }, use) => {
+    await use(api.as(owner));
+  },
+
+  project: async ({ ownerApi }, use) => {
+    await use(await ownerApi.createProject(uniqueName('Proyecto')));
+  },
+
+  member: async ({ ownerApi, project, createAccount }, use) => {
+    const member = await createAccount('miembro');
+    await ownerApi.addMember(project.id, member.user.email);
+    await use(member);
+  },
+
+  createTask: async ({ ownerApi, project }, use) => {
+    await use((task) => ownerApi.createTask(project.id, task));
   },
 
   // Patrón híbrido: la sesión se inyecta, no se tipea. Los specs de login y

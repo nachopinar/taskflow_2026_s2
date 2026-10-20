@@ -7,7 +7,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "@client/*": ["../client/src/*"]
+    }
   },
   "include": ["playwright.config.ts", "src", "tests"]
 }

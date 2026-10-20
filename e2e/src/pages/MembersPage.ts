@@ -1,6 +1,6 @@
 import { Locator, Page, Response } from '@playwright/test';
 import { MemberItem } from '../components/MemberItem';
-import { BasePage, exactText } from './BasePage';
+import { BasePage } from './BasePage';
 
 export class MembersPage extends BasePage {
   readonly root: Locator;
@@ -45,10 +45,6 @@ export class MembersPage extends BasePage {
   }
 
   member(email: string): MemberItem {
-    return new MemberItem(
-      this.items.filter({
-        has: this.page.getByTestId('member-item-email').filter({ hasText: exactText(email) }),
-      }),
-    );
+    return new MemberItem(this.itemWithText(this.items, 'member-item-email', email));
   }
 }

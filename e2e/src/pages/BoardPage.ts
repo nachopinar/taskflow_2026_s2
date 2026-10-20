@@ -1,7 +1,8 @@
 import { Locator, Page, Response } from '@playwright/test';
-import type { Priority, Status } from '../api/types';
+import type { Priority, Status } from '@client/types';
+import type { NewTask } from '../api/types';
 import { TaskCard } from '../components/TaskCard';
-import { BasePage, exactText } from './BasePage';
+import { BasePage } from './BasePage';
 
 export interface BoardFilters {
   priority?: Priority;
@@ -36,16 +37,12 @@ export class BoardPage extends BasePage {
     this.createTitleInput = page.getByTestId('task-create-title-input');
     this.createPrioritySelect = page.getByTestId('task-create-priority-select');
     this.createButton = page.getByTestId('task-create-submit');
-    this.createError = this.root.locator(
-      '[data-testid="task-create-form"] + [data-testid="error-message"]',
-    );
+    this.createError = this.errorAfter('task-create-form');
     this.filterPrioritySelect = page.getByTestId('filter-priority-select');
     this.filterAssigneeSelect = page.getByTestId('filter-assignee-select');
     this.filterSearchInput = page.getByTestId('filter-search-input');
     this.filterApplyButton = page.getByTestId('filter-apply-button');
-    this.listError = this.root.locator(
-      '[data-testid="board-total"] + [data-testid="error-message"]',
-    );
+    this.listError = this.errorAfter('board-total');
   }
 
   private get tasksPath(): string {
@@ -58,13 +55,7 @@ export class BoardPage extends BasePage {
     await this.waitUntilLoaded();
   }
 
-  /** El tablero queda listo cuando cargaron el proyecto y la lista de tareas. */
-  async waitUntilLoaded(): Promise<void> {
-    await this.root.waitFor();
-    await this.loading.waitFor({ state: 'hidden' });
-  }
-
-  async createTask(task: { title: string; priority?: Priority }): Promise<Response> {
+  async createTask(task: Pick<NewTask, 'title' | 'priority'>): Promise<Response> {
     await this.createTitleInput.fill(task.title);
     if (task.priority) await this.createPrioritySelect.selectOption(task.priority);
     const response = await this.mutate(
@@ -72,7 +63,7 @@ export class BoardPage extends BasePage {
       { method: 'POST', path: this.tasksPath },
       { method: 'GET', path: this.tasksPath },
     );
-    await this.loading.waitFor({ state: 'hidden' });
+    await this.waitUntilLoaded();
     return response;
   }
 
@@ -84,7 +75,7 @@ export class BoardPage extends BasePage {
       method: 'GET',
       path: this.tasksPath,
     });
-    await this.loading.waitFor({ state: 'hidden' });
+    await this.waitUntilLoaded();
     return response;
   }
 
@@ -96,7 +87,7 @@ export class BoardPage extends BasePage {
       { method: 'PATCH', path: /^\/api\/tasks\/[^/]+$/ },
       { method: 'GET', path: this.tasksPath },
     );
-    await this.loading.waitFor({ state: 'hidden' });
+    await this.waitUntilLoaded();
     return response;
   }
 
@@ -107,14 +98,10 @@ export class BoardPage extends BasePage {
   /** Tarjeta por título; con `status` se busca solo dentro de esa columna. */
   card(title: string, status?: Status): TaskCard {
     const scope = status ? this.column(status).getByTestId('task-card') : this.cards;
-    return new TaskCard(
-      scope.filter({
-        has: this.page.getByTestId('task-card-title').filter({ hasText: exactText(title) }),
-      }),
-    );
+    return new TaskCard(this.itemWithText(scope, 'task-card-title', title));
   }
 
   cardTitles(): Locator {
-    return this.cards.getByTestId('task-card-title');
+    return new TaskCard(this.cards).title;
   }
 }

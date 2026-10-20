@@ -29,12 +29,11 @@ test.describe('US-05 Crear tarea en un proyecto', () => {
 
 test.describe('US-06 Cambiar estado de una tarea', () => {
   test('mueve la tarea de TODO a IN_PROGRESS desde el tablero', async ({
-    api,
-    owner,
     project,
+    createTask,
     boardPage,
   }) => {
-    const task = await api.as(owner).createTask(project.id, { title: 'Tarea a empezar' });
+    const task = await createTask({ title: 'Tarea a empezar' });
     await boardPage.goto(project.id);
 
     await boardPage.changeStatus(task.title, 'IN_PROGRESS');
@@ -46,8 +45,8 @@ test.describe('US-06 Cambiar estado de una tarea', () => {
   test(
     'no permite pasar de TODO a DONE directamente',
     knownBug('PATCH /tasks/:id acepta la transición TODO → DONE (US-06 AC2)'),
-    async ({ api, owner, project, boardPage }) => {
-      const task = await api.as(owner).createTask(project.id, { title: 'Tarea sin empezar' });
+    async ({ project, createTask, boardPage }) => {
+      const task = await createTask({ title: 'Tarea sin empezar' });
       await boardPage.goto(project.id);
 
       await boardPage.changeStatus(task.title, 'DONE');
@@ -57,9 +56,13 @@ test.describe('US-06 Cambiar estado de una tarea', () => {
     },
   );
 
-  test('no permite reabrir una tarea DONE', async ({ api, owner, project, boardPage }) => {
-    const ownerApi = api.as(owner);
-    const task = await ownerApi.createTask(project.id, { title: 'Tarea terminada' });
+  test('no permite reabrir una tarea DONE', async ({
+    ownerApi,
+    project,
+    createTask,
+    boardPage,
+  }) => {
+    const task = await createTask({ title: 'Tarea terminada' });
     await ownerApi.updateTask(task.id, { status: 'IN_PROGRESS' });
     await ownerApi.updateTask(task.id, { status: 'DONE' });
     await boardPage.goto(project.id);

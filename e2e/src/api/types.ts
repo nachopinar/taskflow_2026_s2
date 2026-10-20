@@ -1,44 +1,16 @@
-export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-export type Status = 'TODO' | 'IN_PROGRESS' | 'DONE';
+import type { Priority, Status, User } from '@client/types';
 
-export interface User {
-  id: string;
-  email: string;
-  name: string | null;
-}
+// Los tipos del dominio (Task, Project, Comment, Priority...) se importan de
+// '@client/types', la misma fuente que usa la app. Acá van solo los propios de la suite.
 
+/** Usuario registrado por la suite, con lo necesario para operar en su nombre. */
 export interface Account {
   user: User;
   password: string;
   token: string;
 }
 
-export interface Project {
-  id: string;
-  name: string;
-  description: string | null;
-  ownerId: string;
-}
-
-export interface Task {
-  id: string;
-  projectId: string;
-  title: string;
-  description: string | null;
-  status: Status;
-  priority: Priority;
-  assigneeId: string | null;
-  dueDate: string | null;
-  tags?: Array<{ id: string; name: string }>;
-}
-
-export interface Comment {
-  id: string;
-  body: string;
-  authorId: string;
-  createdAt: string;
-}
-
+/** Cuerpo de POST /projects/:id/tasks. */
 export interface NewTask {
   title: string;
   description?: string;
@@ -47,4 +19,5 @@ export interface NewTask {
   dueDate?: string | null;
 }
 
+/** Cuerpo de PATCH /tasks/:id. */
 export type TaskUpdate = Partial<NewTask> & { status?: Status };

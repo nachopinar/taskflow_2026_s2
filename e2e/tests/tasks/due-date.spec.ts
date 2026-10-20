@@ -8,9 +8,9 @@ test.describe('US-16 Fecha de vencimiento de tarea', () => {
   test(
     'la fecha cargada se muestra igual en el detalle y en el tablero',
     knownBug(TZ_BUG),
-    async ({ api, owner, project, taskDetailPage, boardPage }) => {
-      const task = await api.as(owner).createTask(project.id, { title: 'Con vencimiento' });
-      await taskDetailPage.goto(project.id, task.id);
+    async ({ project, createTask, taskDetailPage, boardPage }) => {
+      const task = await createTask({ title: 'Con vencimiento' });
+      await taskDetailPage.goto(task);
 
       await taskDetailPage.edit({ dueDate: '2026-09-15' });
 
@@ -21,16 +21,13 @@ test.describe('US-16 Fecha de vencimiento de tarea', () => {
   );
 
   test('se puede quitar la fecha de vencimiento', async ({
-    api,
-    owner,
     project,
+    createTask,
     taskDetailPage,
     boardPage,
   }) => {
-    const task = await api
-      .as(owner)
-      .createTask(project.id, { title: 'Vencimiento a quitar', dueDate: '2026-09-15' });
-    await taskDetailPage.goto(project.id, task.id);
+    const task = await createTask({ title: 'Vencimiento a quitar', dueDate: '2026-09-15' });
+    await taskDetailPage.goto(task);
 
     await taskDetailPage.edit({ dueDate: '' });
 
@@ -42,11 +39,9 @@ test.describe('US-16 Fecha de vencimiento de tarea', () => {
   test(
     'editar el título no modifica la fecha de vencimiento',
     knownBug(`${TZ_BUG}. Cada guardado desde el detalle la corre un día más.`),
-    async ({ api, owner, project, taskDetailPage }) => {
-      const task = await api
-        .as(owner)
-        .createTask(project.id, { title: 'Título original', dueDate: '2026-09-15' });
-      await taskDetailPage.goto(project.id, task.id);
+    async ({ createTask, taskDetailPage }) => {
+      const task = await createTask({ title: 'Título original', dueDate: '2026-09-15' });
+      await taskDetailPage.goto(task);
       const dueDateBefore = await taskDetailPage.dueDateValue.innerText();
 
       await taskDetailPage.edit({ title: 'Título corregido' });

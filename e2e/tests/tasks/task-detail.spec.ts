@@ -3,14 +3,13 @@ import { knownBug } from '../../src/known-bugs';
 
 test.describe('US-12 Editar tarea', () => {
   test('los cambios de título y prioridad se ven en el tablero', async ({
-    api,
-    owner,
     project,
+    createTask,
     taskDetailPage,
     boardPage,
   }) => {
-    const task = await api.as(owner).createTask(project.id, { title: 'Implementar login' });
-    await taskDetailPage.goto(project.id, task.id);
+    const task = await createTask({ title: 'Implementar login' });
+    await taskDetailPage.goto(task);
 
     const response = await taskDetailPage.edit({
       title: 'Implementar login con OAuth',
@@ -28,15 +27,14 @@ test.describe('US-12 Editar tarea', () => {
 
 test.describe('US-13 Eliminar tarea', () => {
   test('al borrar la tarea vuelve al tablero y la tarea ya no está', async ({
-    api,
-    owner,
     project,
     page,
+    createTask,
     taskDetailPage,
     boardPage,
   }) => {
-    const task = await api.as(owner).createTask(project.id, { title: 'Creada por error' });
-    await taskDetailPage.goto(project.id, task.id);
+    const task = await createTask({ title: 'Creada por error' });
+    await taskDetailPage.goto(task);
 
     const response = await taskDetailPage.deleteTask();
 
@@ -52,9 +50,9 @@ test.describe('US-06 Historial de estados', () => {
   test(
     'registra exactamente las transiciones aplicadas',
     knownBug('Crear una tarea agrega una entrada "— → TODO" al historial de estados (US-06, escenario de historial)'),
-    async ({ api, owner, project, taskDetailPage }) => {
-      const task = await api.as(owner).createTask(project.id, { title: 'Tarea con historial' });
-      await taskDetailPage.goto(project.id, task.id);
+    async ({ createTask, taskDetailPage }) => {
+      const task = await createTask({ title: 'Tarea con historial' });
+      await taskDetailPage.goto(task);
 
       await taskDetailPage.changeStatus('IN_PROGRESS');
       await taskDetailPage.changeStatus('DONE');

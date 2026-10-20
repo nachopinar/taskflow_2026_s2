@@ -1,6 +1,6 @@
 import { Locator, Page } from '@playwright/test';
 import { ProjectCard } from '../components/ProjectCard';
-import { BasePage, exactText } from './BasePage';
+import { BasePage } from './BasePage';
 
 export class ProjectsPage extends BasePage {
   readonly root: Locator;
@@ -21,9 +21,7 @@ export class ProjectsPage extends BasePage {
     this.nameInput = page.getByTestId('project-name-input');
     this.descriptionInput = page.getByTestId('project-description-input');
     this.createButton = page.getByTestId('project-create-submit');
-    this.createError = this.root.locator(
-      '[data-testid="project-create-form"] + [data-testid="error-message"]',
-    );
+    this.createError = this.errorAfter('project-create-form');
   }
 
   /**
@@ -46,10 +44,6 @@ export class ProjectsPage extends BasePage {
   }
 
   card(name: string): ProjectCard {
-    return new ProjectCard(
-      this.cards.filter({
-        has: this.page.getByTestId('project-card-name').filter({ hasText: exactText(name) }),
-      }),
-    );
+    return new ProjectCard(this.itemWithText(this.cards, 'project-card-name', name));
   }
 }

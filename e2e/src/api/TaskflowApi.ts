@@ -1,6 +1,7 @@
 import { APIRequestContext, APIResponse, expect } from '@playwright/test';
+import type { Comment, Project, Task } from '@client/types';
 import { VALID_PASSWORD, uniqueEmail } from '../data/factories';
-import type { Account, Comment, NewTask, Project, Task, TaskUpdate } from './types';
+import type { Account, NewTask, TaskUpdate } from './types';
 
 /**
  * Cliente de la API para preparar el estado de los tests (patrón híbrido del ADR-001).
@@ -19,7 +20,7 @@ export class TaskflowApi {
   }
 
   async register(email = uniqueEmail(), password = VALID_PASSWORD): Promise<Account> {
-    const body = await this.call<{ user: Account['user']; token: string }>(
+    const body = await this.call<Pick<Account, 'user' | 'token'>>(
       'post',
       '/api/auth/register',
       { email, password },

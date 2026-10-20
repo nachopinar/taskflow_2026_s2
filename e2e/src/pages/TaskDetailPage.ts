@@ -1,12 +1,11 @@
 import { Locator, Page, Response } from '@playwright/test';
-import type { Priority, Status } from '../api/types';
+import type { Status, Task } from '@client/types';
+import type { TaskUpdate } from '../api/types';
 import { CommentItem } from '../components/CommentItem';
 import { TagChip } from '../components/TagChip';
-import { BasePage, exactText } from './BasePage';
+import { BasePage } from './BasePage';
 
-export interface TaskEdit {
-  title?: string;
-  priority?: Priority;
+export interface TaskEdit extends Pick<TaskUpdate, 'title' | 'priority'> {
   /** Etiqueta visible de la opción ('Sin asignar' o el email del miembro). */
   assigneeLabel?: string;
   /** 'YYYY-MM-DD', o '' para quitar la fecha. */
@@ -52,9 +51,7 @@ export class TaskDetailPage extends BasePage {
     this.statusSelect = page.getByTestId('task-status-select');
     this.statusSubmit = page.getByTestId('task-status-submit');
     this.currentStatus = page.getByTestId('task-current-status');
-    this.statusError = page.locator(
-      '[data-testid="task-status-form"] + [data-testid="error-message"]',
-    );
+    this.statusError = this.errorAfter('task-status-form');
     this.tagChips = page.getByTestId('tag-list').getByTestId('tag-chip');
     this.tagInput = page.getByTestId('tag-add-input');
     this.tagAddButton = page.getByTestId('tag-add-button');
@@ -69,15 +66,9 @@ export class TaskDetailPage extends BasePage {
     return `/api/tasks/${this.taskId}`;
   }
 
-  /** Espera la tarea y los comentarios: hasta entonces la página muestra 'Cargando…'. */
-  private async waitUntilLoaded(): Promise<void> {
-    await this.root.waitFor();
-    await this.loading.waitFor({ state: 'hidden' });
-  }
-
-  async goto(projectId: string, taskId: string): Promise<void> {
-    this.taskId = taskId;
-    await this.page.goto(`/projects/${projectId}/tasks/${taskId}`);
+  async goto(task: Pick<Task, 'id' | 'projectId'>): Promise<void> {
+    this.taskId = task.id;
+    await this.page.goto(`/projects/${task.projectId}/tasks/${task.id}`);
     await this.waitUntilLoaded();
   }
 
@@ -133,11 +124,7 @@ export class TaskDetailPage extends BasePage {
   }
 
   tag(name: string): TagChip {
-    return new TagChip(
-      this.tagChips.filter({
-        has: this.page.getByTestId('tag-chip-name').filter({ hasText: exactText(name) }),
-      }),
-    );
+    return new TagChip(this.itemWithText(this.tagChips, 'tag-chip-name', name));
   }
 
   async addComment(body: string): Promise<Response> {
@@ -158,14 +145,14 @@ export class TaskDetailPage extends BasePage {
   }
 
   comment(body: string): CommentItem {
-    return new CommentItem(
-      this.comments.filter({
-        has: this.page.getByTestId('comment-item-body').filter({ hasText: exactText(body) }),
-      }),
-    );
+    return new CommentItem(this.itemWithText(this.comments, 'comment-item-body', body));
+  }
+
+  tagNames(): Locator {
+    return new TagChip(this.tagChips).name;
   }
 
   commentBodies(): Locator {
-    return this.comments.getByTestId('comment-item-body');
+    return new CommentItem(this.comments).body;
   }
 }
