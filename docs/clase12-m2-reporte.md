@@ -53,7 +53,7 @@ Las expectativas se escribieron antes de ejecutar, a partir del código.
 | SQLi en login | 401 | 401 | Prisma parametriza |
 | SQLi en `search`, payload de la guía | 500 | 500 (`near "ORDER"`) | `$queryRawUnsafe` concatena el texto |
 | SQLi en `search`, `') OR 1=1 --` | 200 con datos ajenos | 500: faltaba cerrar un paréntesis | Ídem |
-| SQLi en `search`, `')) OR 1=1 --` | 200 con datos ajenos | **200 con 13 tareas de 3 proyectos** | Ídem |
+| SQLi en `search`, `')) OR 1=1 --` | 200 con datos ajenos | **200 con 13 tareas de 3 proyectos, incluida una privada de Ana** | Ídem |
 | XSS almacenado por la UI | Texto, sin `alert` | Texto, sin `alert`, en lista y detalle | React escapa; no hay `dangerouslySetInnerHTML` |
 | Token `alg: none` | 401 | 401 | `jwt.verify` exige firma |
 
@@ -69,7 +69,7 @@ Las expectativas se escribieron antes de ejecutar, a partir del código.
 | **Título** | Inyección SQL en la búsqueda de tareas |
 | **Severidad** | CRITICAL |
 | **Descripción** | `findTasks` concatena `search` en `$queryRawUnsafe` (`server/src/modules/tasks/tasks.repository.ts:33`). |
-| **Pasos de reproducción** | 1. Iniciar sesión como Bob y crear un proyecto propio.<br>2. `GET /api/projects/:id/tasks` con `search=')) OR 1=1 --`: devuelve tareas de otros proyectos.<br>3. Con `search=')) UNION SELECT id,<id>,email,substr(passwordHash,1,7),'TODO','LOW',NULL,NULL,createdAt,createdAt FROM users --`, donde `<id>` es el número del proyecto: devuelve emails y el inicio de cada hash. |
+| **Pasos de reproducción** | 1. Iniciar sesión como Bob y crear un proyecto propio.<br>2. `GET /api/projects/:id/tasks` con `search=')) OR 1=1 --`: devuelve tareas de todos los proyectos, incluida la privada de Ana, donde Bob no es miembro.<br>3. Con `search=')) UNION SELECT id,<id>,email,substr(passwordHash,1,7),'TODO','LOW',NULL,NULL,createdAt,createdAt FROM users --`, donde `<id>` es el número del proyecto: devuelve emails y el inicio de cada hash. |
 | **Impacto** | Cualquier usuario registrado lee toda la base, incluidos emails y hashes de contraseñas. |
 | **Remediación propuesta** | Usar el query builder de Prisma o `$queryRaw` parametrizado. |
 
