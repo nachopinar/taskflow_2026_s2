@@ -50,6 +50,7 @@ export default function TaskComments({
       <h2>Comentarios</h2>
       <form className="form" data-testid="comment-add-form" onSubmit={onAdd}>
         <textarea
+          aria-label="Nuevo comentario"
           data-testid="comment-add-input"
           value={body}
           onChange={(e) => setBody(e.target.value)}
