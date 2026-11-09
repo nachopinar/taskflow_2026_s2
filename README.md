@@ -80,6 +80,7 @@ El comando `db:setup` carga datos de ejemplo. Los tres usuarios comparten la con
 | `npm run db:reset` | Borra la base y la vuelve a crear desde cero |
 | `npm test` | Corre la suite de tests |
 | `npm run test:coverage` | Corre la suite con reporte de cobertura |
+| `npm run test:pact` | Corre los tests de contrato (consumidor y después proveedor) |
 
 ## Frontend
 
@@ -163,6 +164,37 @@ npm test
 ```
 
 Está lejos de ser exhaustiva — ampliarla es parte del trabajo del semestre.
+
+### Tests end-to-end (Playwright)
+
+La suite de UI vive en `e2e/` y sigue el [ADR-001](docs/0001-arquitectura-de-testing.md).
+Levanta sola su propia API (puerto 3100, base `server/prisma/e2e.db`) y el build
+del frontend (puerto 5174), así que no choca con `npm run dev`.
+
+```bash
+npm --prefix e2e run install:browsers   # una sola vez: descarga Chromium
+npm run test:e2e                        # toda la suite
+npm --prefix e2e run test:no-known-bugs # excluye los tests de defectos conocidos
+npm --prefix e2e run report             # abre el reporte HTML de la última corrida
+```
+
+Los tests etiquetados `@known-bug` fallan a propósito: describen lo que pide la
+especificación y la app todavía no cumple. La selección de historias, la
+trazabilidad y el detalle de cada defecto están en
+[`docs/reporte-tests-e2e.md`](docs/reporte-tests-e2e.md).
+
+### Tests de contrato (Pact)
+
+Pact (`@pact-foundation/pact` 16.5.0) ya queda instalado con `npm install`. El cliente es el **consumidor** y la API el **proveedor**.
+
+| Lado | Dónde van los tests | Runner | Comando |
+|------|---------------------|--------|---------|
+| Consumidor | `client/tests/pact/**/*.pact.test.ts` | Vitest (`client/vitest.pact.config.ts`) | `npm run test:pact:consumer` |
+| Proveedor | `server/tests/pact/**/*.pact.test.ts` | Jest (`server/jest.pact.config.js`) | `npm run test:pact:provider` |
+
+- Los tests del consumidor escriben los contratos en `pacts/` (en la raíz); la verificación del proveedor los lee de ahí.
+- Los tests de `server/tests/pact/` no corren con `npm test`, solo con los comandos de Pact.
+- La verificación del proveedor reutiliza `globalSetup.ts` y `setup.ts`, así que corre contra su propia base SQLite.
 
 ## Estructura
 
