@@ -45,6 +45,7 @@ export default function TaskTags({ task, onChanged }: TaskTagsProps) {
       <form className="form form-inline" data-testid="tag-add-form" onSubmit={onAdd}>
         <input
           type="text"
+          aria-label="Nueva etiqueta"
           data-testid="tag-add-input"
           value={tagName}
           onChange={(e) => setTagName(e.target.value)}
