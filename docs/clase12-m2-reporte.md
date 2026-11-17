@@ -67,7 +67,7 @@ Las expectativas se escribieron antes de ejecutar, a partir del código.
 | SEC-01 | |
 |---|---|
 | **Título** | Inyección SQL en la búsqueda de tareas |
-| **Severidad** | CRITICAL |
+| **Severidad** | **6.5 MEDIUM** (CVSS 3.1 base) · [`CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N`](https://www.first.org/cvss/calculator/3.1#CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N). Antes se había calificado CRITICAL a criterio; ver [justificación](#cvss-31-de-sec-01-y-sec-02). |
 | **Descripción** | `findTasks` concatena `search` en `$queryRawUnsafe` (`server/src/modules/tasks/tasks.repository.ts:33`). |
 | **Pasos de reproducción** | 1. Iniciar sesión como Bob y crear un proyecto propio.<br>2. `GET /api/projects/:id/tasks` con `search=')) OR 1=1 --`: devuelve tareas de todos los proyectos, incluida la privada de Ana, donde Bob no es miembro.<br>3. Con `search=')) UNION SELECT id,<id>,email,substr(passwordHash,1,7),'TODO','LOW',NULL,NULL,createdAt,createdAt FROM users --`, donde `<id>` es el número del proyecto: devuelve emails y el inicio de cada hash. |
 | **Impacto** | Cualquier usuario registrado lee toda la base, incluidos emails y hashes de contraseñas. |
@@ -76,11 +76,30 @@ Las expectativas se escribieron antes de ejecutar, a partir del código.
 | SEC-02 | |
 |---|---|
 | **Título** | Editar o borrar tareas de proyectos ajenos |
-| **Severidad** | HIGH |
+| **Severidad** | **8.3 HIGH** (CVSS 3.1 base) · [`CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:H`](https://www.first.org/cvss/calculator/3.1#CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:H); ver [justificación](#cvss-31-de-sec-01-y-sec-02). |
 | **Descripción** | `PATCH` y `DELETE /tasks/:taskId` no usan `requireTaskProjectMember` (`server/src/modules/tasks/tasks.routes.ts:17-18`). |
 | **Pasos de reproducción** | 1. Ana crea un proyecto y dos tareas.<br>2. Bob envía `PATCH /api/tasks/:id` con `{"title":"Modificada por Bob"}`: 200.<br>3. Bob envía `DELETE /api/tasks/:id`: 204, y la tarea desaparece de la lista de Ana. |
 | **Impacto** | Cualquier usuario registrado altera o borra tareas ajenas. Los ids son secuenciales (`task-13`), así que se pueden recorrer. |
 | **Remediación propuesta** | Agregar `requireTaskProjectMember()` a ambas rutas, y exigir el rol que pida la spec para borrar. |
+
+### CVSS 3.1 de SEC-01 y SEC-02
+
+Puntajes base calculados con la [calculadora de FIRST](https://www.first.org/cvss/calculator/3.1) (los links de la fila de severidad abren cada vector ya cargado). Los supuestos se verificaron el 2026-11-17 contra la API local (rama `dev`, `eb8fe38`), con usuarios y proyectos nuevos.
+
+| Métrica | SEC-01 (SQLi en búsqueda) | SEC-02 (PATCH/DELETE sin membresía) |
+|---|---|---|
+| **AV** Vector de ataque | **N**: request HTTP a la API | **N**: request HTTP a la API |
+| **AC** Complejidad | **L**: un único payload en `search`, sin condiciones de carrera | **L**: basta con el id de la tarea, que es secuencial (`task-13`) |
+| **PR** Privilegios | **L**: hace falta un token de cualquier usuario y un proyecto propio | **L**: hace falta un token de cualquier usuario, sin ser miembro |
+| **UI** Interacción | **N** | **N** |
+| **S** Alcance | **U**: la base que se lee es la de la propia API | **U**: solo afecta datos de la API |
+| **C** Confidencialidad | **H**: con `UNION SELECT` se lee cualquier tabla, incluidos emails y hashes de `users` | **L**: `PATCH` con body `{}` responde 200 con la tarea ajena completa (título, descripción, proyecto); no expone comentarios, historial ni usuarios |
+| **I** Integridad | **N**: un `UPDATE` apilado (`x')); UPDATE tasks SET title='pwned' ... --`) respondió 200 y la tarea quedó igual; Prisma ejecuta una sola sentencia | **H**: se modifica cualquier campo de cualquier tarea de cualquier proyecto |
+| **A** Disponibilidad | **N**: no se logró degradar el servicio; los payloads mal formados dan 500 solo a quien los envía | **H**: `DELETE` borra la tarea con sus comentarios, historial y tags (Ana recibe 404 después); recorriendo ids se vacían todos los proyectos |
+| **Vector** | `CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N` | `CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:H` |
+| **Puntaje base** | **6.5 MEDIUM** | **8.3 HIGH** |
+
+**Por qué SEC-01 baja de CRITICAL a MEDIUM:** el puntaje base solo mide lo demostrado (lectura). Con `PR:N` sería 7.5, pero el registro abierto igual exige un token, que es `PR:L`. El impacto real puede ser mayor, porque con los hashes se puede intentar crackear contraseñas y tomar cuentas, pero eso es un ataque encadenado que CVSS base no suma. Por eso se mantiene como **primera prioridad de remediación** junto a SEC-02.
 
 **Otros candidatos**
 
@@ -88,6 +107,41 @@ Las expectativas se escribieron antes de ejecutar, a partir del código.
 - **MEDIUM:** bloqueo de cuentas ajenas y enumeración de emails (ver Extra).
 - **MEDIUM:** faltan headers de seguridad y CORS abierto (`server/src/app.ts:12`).
 - **LOW:** `X-Powered-By` revela la tecnología; un campo desconocido en el body da 500.
+
+## OWASP ZAP: cruce con los hallazgos manuales
+
+Baseline scan (ZAP 2.17.0, imagen `ghcr.io/zaproxy/zaproxy:stable`) ejecutado el 2026-11-17 sobre `dev` (`eb8fe38`) con la app local de `npm run dev`. Son dos corridas porque el frontend y la API están en puertos distintos:
+
+| Objetivo | Comando | Reporte |
+|---|---|---|
+| Frontend (Vite) | `zap-baseline.py -t http://host.docker.internal:5174 -j` | [`zap/zap-baseline-web.html`](zap/zap-baseline-web.html) · [JSON](zap/zap-baseline-web.json) |
+| API (Express) | `zap-baseline.py -t http://host.docker.internal:3000/api/projects` | [`zap/zap-baseline-api.html`](zap/zap-baseline-api.html) · [JSON](zap/zap-baseline-api.json) |
+
+Para reproducir: con `npm run dev` levantado, iniciar otro Vite accesible desde Docker (`cd client && npx vite --host 0.0.0.0 --port 5174`), porque el de `:5173` solo escucha en `localhost`; después, desde la raíz, `docker run --rm -v "<ruta>/docs/zap:/zap/wrk:rw" -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py <args> -r <reporte>.html -J <reporte>.json -I`. `-j` suma el AJAX spider, necesario porque el frontend es una SPA. El baseline es **pasivo**: navega y mira las respuestas, no envía ataques ni usa token.
+
+Resultado: 0 FAIL; 10 reglas en WARN en el frontend (7 de riesgo Medium o Low y 3 informativas) y 3 en la API (2 de riesgo y 1 informativa).
+
+| Alerta ZAP (id) | Riesgo ZAP | Dónde | Hallazgo manual relacionado | Cruce |
+|---|---|---|---|---|
+| Content Security Policy (CSP) Header Not Set (10038) | Medium | Web: `/`, `/login` | Headers: CSP "No" | **Coincide**, pero ZAP lo marca en el HTML del frontend y la revisión manual en la API (ver nota) |
+| Missing Anti-clickjacking Header (10020) | Medium | Web: `/` | Headers: X-Frame-Options "No" | **Coincide** (ídem) |
+| X-Content-Type-Options Header Missing (10021) | Low | Web: `/`, `/src/main.tsx` | Headers: X-Content-Type-Options "No" | **Coincide** (ídem) |
+| Cross-Domain Misconfiguration (10098) | Medium | API: `/api/projects` y demás; web: archivos de Vite | Headers: CORS `*`; candidato MEDIUM (`server/src/app.ts:12`) | **Coincide** en la API. En la web el `*` lo pone el servidor de desarrollo de Vite |
+| Server Leaks Information via "X-Powered-By" (10037) | Low | API: todas las rutas; web: `/api/auth/login` vía proxy | Headers: `X-Powered-By: Express`; candidato LOW | **Coincide** |
+| Permissions Policy Header Not Set (10063) | Low | Web | No se había revisado | **Nuevo de ZAP** (mismo origen: no hay middleware de headers) |
+| Cross-Origin-Embedder-Policy / Cross-Origin-Opener-Policy Missing (90004) | Low | Web | No se había revisado | **Nuevo de ZAP** (ídem) |
+| Information Disclosure - Suspicious Comments (10027) | Info | Web: `node_modules/.vite/deps/*.js` | - | **Falso positivo**: son `TODO` de React y React Router servidos por el servidor de desarrollo, no código de TaskFlow |
+| Storable and Cacheable Content / Non-Storable Content (10049) | Info | Web y API | - | Informativo, sin riesgo: no hay datos sensibles cacheables sin token |
+| Modern Web Application (10109) | Info | Web | - | Informativo: avisa que conviene el AJAX spider, que ya se usó |
+| No lo detecta | - | - | Strict-Transport-Security ausente | Esperable: ZAP solo la reporta sobre HTTPS y la app local corre en HTTP |
+| No lo detecta | - | - | **SEC-01** SQLi en `search` | El baseline no ataca y sin token no llega a `GET /projects/:id/tasks`. Haría falta un *active scan* autenticado |
+| No lo detecta | - | - | **SEC-02** PATCH/DELETE sin membresía | Control de acceso entre dos usuarios: ningún escáner lo ve sin conocer las reglas de negocio |
+| No lo detecta | - | - | Secreto JWT por defecto, enumeración y bloqueo de cuentas, 500 por campo desconocido | Requieren leer el código o enviar requests específicas |
+| No lo detecta | - | - | Dependencias vulnerables (`npm audit`) | Fuera de alcance de ZAP; lo cubre `npm audit` |
+
+**Nota sobre la API:** sin token, el spider solo recibe respuestas 401 y 404 en JSON. ZAP no evalúa CSP ni anti-clickjacking en respuestas que no son HTML, y a su umbral por defecto tampoco X-Content-Type-Options en errores 4xx. Por eso esos tres headers aparecen solo en el frontend, aunque la API tampoco los envía (`curl -i` a `/api/health`, tabla de headers de arriba).
+
+**Conclusión:** ZAP confirma los 5 hallazgos de headers y CORS, y suma 3 headers que no se habían revisado (Permissions-Policy, COEP, COOP), todos con la misma remediación: agregar un middleware de headers (por ejemplo `helmet`) y restringir el origen de CORS. Los dos hallazgos más graves, SEC-01 y SEC-02, solo aparecieron en la revisión manual: el escaneo pasivo complementa las pruebas manuales, no las reemplaza.
 
 ## Control verificado
 
