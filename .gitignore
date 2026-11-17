@@ -9,5 +9,6 @@ server/tests/.tmp/
 
 action.md
 *smells.md
+!docs/refactor-code-smells.md
 pact-logs/
 pacts/*.json
