@@ -5,7 +5,7 @@ import { CommentItem } from '../components/CommentItem';
 import { TagChip } from '../components/TagChip';
 import { BasePage } from './BasePage';
 
-export interface TaskEdit extends Pick<TaskUpdate, 'title' | 'priority'> {
+export interface TaskEdit extends Pick<TaskUpdate, 'title' | 'description' | 'priority'> {
   /** Etiqueta visible de la opción ('Sin asignar' o el email del miembro). */
   assigneeLabel?: string;
   /** 'YYYY-MM-DD', o '' para quitar la fecha. */
@@ -16,6 +16,7 @@ export interface TaskEdit extends Pick<TaskUpdate, 'title' | 'priority'> {
 export class TaskDetailPage extends BasePage {
   readonly root: Locator;
   readonly titleInput: Locator;
+  readonly descriptionInput: Locator;
   readonly prioritySelect: Locator;
   readonly assigneeSelect: Locator;
   readonly dueDateInput: Locator;
@@ -41,6 +42,7 @@ export class TaskDetailPage extends BasePage {
     super(page);
     this.root = page.getByTestId('task-detail-page');
     this.titleInput = page.getByTestId('task-title-input');
+    this.descriptionInput = page.getByTestId('task-description-input');
     this.prioritySelect = page.getByTestId('task-priority-select');
     this.assigneeSelect = page.getByTestId('task-assignee-select');
     this.dueDateInput = page.getByTestId('task-duedate-input');
@@ -79,6 +81,7 @@ export class TaskDetailPage extends BasePage {
 
   async edit(changes: TaskEdit): Promise<Response> {
     if (changes.title !== undefined) await this.titleInput.fill(changes.title);
+    if (changes.description !== undefined) await this.descriptionInput.fill(changes.description);
     if (changes.priority) await this.prioritySelect.selectOption(changes.priority);
     if (changes.assigneeLabel !== undefined) {
       await this.assigneeSelect.selectOption({ label: changes.assigneeLabel });
