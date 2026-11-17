@@ -2,7 +2,7 @@
 
 - **Fecha:** 2026-10-20
 - **Herramienta:** Playwright 1.63.0 (Chromium), en `e2e/`, según el [ADR-001](0001-arquitectura-de-testing.md)
-- **Corrida:** `npm run test:e2e`: 41 tests, 29 pasan y 12 fallan por defectos de la app
+- **Corrida:** `npm run test:e2e`: 43 tests, 31 pasan y 12 fallan por defectos de la app (sin contar la auditoría de accesibilidad de `a11y.spec.ts`)
 - **Estabilidad:** 3 corridas consecutivas (`--repeat-each=3`) con resultados idénticos y 0 tests flaky
 
 ## 1. Criterio de selección
@@ -65,9 +65,11 @@ Un test E2E cuesta más que uno de API: es más lento, necesita la app levantada
 | `tasks/comments` | muestra los comentarios del más antiguo al más reciente | US-08 AC4 | ❌ D8 |
 | `tasks/comments` | solo se pueden borrar los comentarios propios | US-08 AC6 | ✅ |
 | `tasks/task-detail` | los cambios de título y prioridad se ven en el tablero | US-12 AC1 | ✅ |
+| `tasks/task-detail` | la descripción editada se conserva al recargar el detalle | US-12 AC1 | ✅ |
 | `tasks/task-detail` | al borrar la tarea vuelve al tablero y la tarea ya no está | US-13 AC3 | ✅ |
 | `tasks/assignment` | el owner suma un miembro y le asigna una tarea sin cambiar su estado | US-14 AC1, AC4, AC5 · US-11 | ✅ |
 | `tasks/assignment` | desasigna una tarea | US-14 AC3 | ✅ |
+| `tasks/assignment` | rechaza asignar la tarea a alguien que ya no es miembro del proyecto | US-14 AC1 | ✅ |
 | `tasks/tags` | agrega una etiqueta y la quita | US-15 | ✅ |
 | `tasks/tags` | guarda la etiqueta en minúsculas y sin espacios en los extremos | US-15 AC1 | ❌ D9 |
 | `tasks/tags` | no duplica una etiqueta que ya tiene, aunque cambien las mayúsculas | US-15 AC2, AC3 | ❌ D10 |
@@ -79,19 +81,21 @@ Un test E2E cuesta más que uno de API: es más lento, necesita la app levantada
 
 Ninguno de estos tests se ajustó al comportamiento actual ni se marcó con `test.fail()`. Describen lo que pide la especificación y siguen en rojo hasta que se corrija el defecto, con el mismo criterio que [`reporte-tests-fallidos.md`](reporte-tests-fallidos.md). Para correr la suite sin ellos: `npm --prefix e2e run test:no-known-bugs`.
 
-| # | Criterio | Qué ve el usuario | Dónde mirar |
-|---|----------|-------------------|-------------|
-| D1 | US-03 AC1 | El proyecto "ab" se crea sin error. | `createProject` en `projects.service.ts` valida solo el máximo. |
-| D2 | US-11 AC6 | La tarea sigue mostrando como asignado al ex-miembro. | `removeMember` en `projects.service.ts` no libera las tareas. |
-| D3 | US-06 AC2 | Una tarea TODO pasa directo a la columna DONE. | `FORBIDDEN_TRANSITIONS` en `transitions.ts` no incluye TODO → DONE. |
-| D4 | US-06 AC7 | El historial muestra 3 entradas ("— → TODO" de la creación) en lugar de las 2 transiciones. | `createTask` en `tasks.service.ts` inserta una entrada de historial. |
-| D5 | US-07 AC5 | Con prioridad HIGH y un asignado, aparecen tareas LOW de ese asignado. | `buildFilters` en `tasks.repository.ts` reemplaza el filtro en vez de acumularlo. |
-| D6 | US-07 AC4 | Buscar "login" no encuentra "Implementar Login". | `findTasks` usa `instr`, que distingue mayúsculas. |
-| D7 | RNF Seg. 1 | Buscar "O'Brien" muestra "Unexpected server error". | `findTasks` arma el SQL con `$queryRawUnsafe` y concatena el texto: además del error es una **inyección SQL**. |
-| D8 | US-08 AC4 | Los comentarios aparecen del más nuevo al más viejo. | `listByTask` en `comments.repository.ts` ordena `desc`. |
-| D9 | US-15 AC1 | La etiqueta "Backend" se guarda con mayúscula. | `addTag` en `tasks.service.ts` no pasa el nombre a minúsculas. |
-| D10 | US-15 AC2-3 | "bug" y "BUG" quedan como dos etiquetas en la misma tarea. | `addTag` no normaliza el nombre ni verifica si la tarea ya tiene la etiqueta. |
-| D11 | US-16 AC3 | Se carga 2026-09-15 y se muestra 2026-09-14. Peor aún: cada vez que se guarda la tarea desde el detalle (por ejemplo, para cambiar el título), la fecha retrocede un día más. | `formatDueDate` en `lib/ids.ts` usa los getters locales (`getDate`) sobre una fecha guardada en UTC. |
+Cada defecto tiene su GitHub issue con el criterio violado, el entorno, los pasos, lo esperado y lo obtenido, la reproducibilidad, la evidencia y la severidad. La tabla es el índice.
+
+| # | Issue | Severidad | Criterio | Qué ve el usuario | Dónde mirar |
+|---|-------|-----------|----------|-------------------|-------------|
+| D1 | [#20](https://github.com/nachopinar/taskflow_2026_s2/issues/20) | Baja | US-03 AC1 | El proyecto "ab" se crea sin error. | `createProject` en `projects.service.ts` valida solo el máximo. |
+| D2 | [#21](https://github.com/nachopinar/taskflow_2026_s2/issues/21) | Alta | US-11 AC6 | La tarea sigue mostrando como asignado al ex-miembro. | `removeMember` en `projects.service.ts` no libera las tareas. |
+| D3 | [#22](https://github.com/nachopinar/taskflow_2026_s2/issues/22) | Alta | US-06 AC2 | Una tarea TODO pasa directo a la columna DONE. | `FORBIDDEN_TRANSITIONS` en `transitions.ts` no incluye TODO → DONE. |
+| D4 | [#23](https://github.com/nachopinar/taskflow_2026_s2/issues/23) | Media | US-06 AC7 | El historial muestra 3 entradas ("— → TODO" de la creación) en lugar de las 2 transiciones. | `createTask` en `tasks.service.ts` inserta una entrada de historial. |
+| D5 | [#24](https://github.com/nachopinar/taskflow_2026_s2/issues/24) | Media | US-07 AC5 | Con prioridad HIGH y un asignado, aparecen tareas LOW de ese asignado. | `buildFilters` en `tasks.repository.ts` reemplaza el filtro en vez de acumularlo. |
+| D6 | [#25](https://github.com/nachopinar/taskflow_2026_s2/issues/25) | Media | US-07 AC4 | Buscar "login" no encuentra "Implementar Login". | `findTasks` usa `instr`, que distingue mayúsculas. |
+| D7 | [#26](https://github.com/nachopinar/taskflow_2026_s2/issues/26) | Crítica | RNF Seg. 1 | Buscar "O'Brien" muestra "Unexpected server error". | `findTasks` arma el SQL con `$queryRawUnsafe` y concatena el texto: además del error es una **inyección SQL**. |
+| D8 | [#27](https://github.com/nachopinar/taskflow_2026_s2/issues/27) | Baja | US-08 AC4 | Los comentarios aparecen del más nuevo al más viejo. | `listByTask` en `comments.repository.ts` ordena `desc`. |
+| D9 | [#28](https://github.com/nachopinar/taskflow_2026_s2/issues/28) | Baja | US-15 AC1 | La etiqueta "Backend" se guarda con mayúscula. | `addTag` en `tasks.service.ts` no pasa el nombre a minúsculas. |
+| D10 | [#29](https://github.com/nachopinar/taskflow_2026_s2/issues/29) | Media | US-15 AC2-3 | "bug" y "BUG" quedan como dos etiquetas en la misma tarea. | `addTag` no normaliza el nombre ni verifica si la tarea ya tiene la etiqueta. |
+| D11 | [#30](https://github.com/nachopinar/taskflow_2026_s2/issues/30) | Alta | US-16 AC3 | Se carga 2026-09-15 y se muestra 2026-09-14. Peor aún: cada vez que se guarda la tarea desde el detalle (por ejemplo, para cambiar el título), la fecha retrocede un día más. | `formatDueDate` en `lib/ids.ts` usa los getters locales (`getDate`) sobre una fecha guardada en UTC. |
 
 ### Cómo se verificó que los rojos son defectos reales (sin falsos negativos)
 

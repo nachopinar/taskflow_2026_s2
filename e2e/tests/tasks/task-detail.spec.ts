@@ -23,6 +23,27 @@ test.describe('US-12 Editar tarea', () => {
       'CRITICAL',
     );
   });
+
+  test('la descripción editada se conserva al recargar el detalle', async ({
+    createTask,
+    taskDetailPage,
+  }) => {
+    // Arrange
+    const task = await createTask({ title: 'Documentar la API', description: 'Borrador inicial' });
+    await taskDetailPage.goto(task);
+
+    // Act
+    const response = await taskDetailPage.edit({
+      description: 'Listar los endpoints y sus códigos de error',
+    });
+    await taskDetailPage.reload();
+
+    // Assert
+    expect(response.status()).toBe(200);
+    await expect(taskDetailPage.descriptionInput).toHaveValue(
+      'Listar los endpoints y sus códigos de error',
+    );
+  });
 });
 
 test.describe('US-13 Eliminar tarea', () => {

@@ -3,6 +3,8 @@ import type { Comment, Project, Task } from '@client/types';
 import { VALID_PASSWORD, uniqueEmail } from '../data/factories';
 import type { Account, NewTask, TaskUpdate } from './types';
 
+type HttpMethod = 'get' | 'post' | 'patch' | 'delete';
+
 /**
  * Cliente de la API para preparar el estado de los tests (patrón híbrido del ADR-001).
  * Cada llamada exige una respuesta exitosa: si el arrange falla, el test se corta
@@ -45,6 +47,10 @@ export class TaskflowApi {
     await this.call('post', `/api/projects/${projectId}/members`, { email });
   }
 
+  async removeMember(projectId: string, userId: string): Promise<void> {
+    await this.send('delete', `/api/projects/${projectId}/members/${userId}`);
+  }
+
   createTask(projectId: string, task: NewTask): Promise<Task> {
     return this.call('post', `/api/projects/${projectId}/tasks`, task);
   }
@@ -65,16 +71,18 @@ export class TaskflowApi {
     return this.call('post', `/api/tasks/${taskId}/comments`, { body });
   }
 
-  private async call<T>(
-    method: 'get' | 'post' | 'patch',
-    url: string,
-    data?: unknown,
-  ): Promise<T> {
+  private async call<T>(method: HttpMethod, url: string, data?: unknown): Promise<T> {
+    const res = await this.send(method, url, data);
+    return (await res.json()) as T;
+  }
+
+  /** Como `call`, para respuestas sin cuerpo (204). */
+  private async send(method: HttpMethod, url: string, data?: unknown): Promise<APIResponse> {
     const headers = this.token ? { Authorization: `Bearer ${this.token}` } : undefined;
     const res = await this.request[method](url, { data, headers });
     expect(res.ok(), `${method.toUpperCase()} ${url} → ${res.status()} ${await res.text()}`).toBe(
       true,
     );
-    return (await res.json()) as T;
+    return res;
   }
 }
