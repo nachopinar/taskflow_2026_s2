@@ -89,6 +89,41 @@ Las expectativas se escribieron antes de ejecutar, a partir del código.
 - **MEDIUM:** faltan headers de seguridad y CORS abierto (`server/src/app.ts:12`).
 - **LOW:** `X-Powered-By` revela la tecnología; un campo desconocido en el body da 500.
 
+## OWASP ZAP: cruce con los hallazgos manuales
+
+Baseline scan (ZAP 2.17.0, imagen `ghcr.io/zaproxy/zaproxy:stable`) ejecutado el 2026-11-17 sobre `dev` (`eb8fe38`) con la app local de `npm run dev`. Son dos corridas porque el frontend y la API están en puertos distintos:
+
+| Objetivo | Comando | Reporte |
+|---|---|---|
+| Frontend (Vite) | `zap-baseline.py -t http://host.docker.internal:5174 -j` | [`zap/zap-baseline-web.html`](zap/zap-baseline-web.html) · [JSON](zap/zap-baseline-web.json) |
+| API (Express) | `zap-baseline.py -t http://host.docker.internal:3000/api/projects` | [`zap/zap-baseline-api.html`](zap/zap-baseline-api.html) · [JSON](zap/zap-baseline-api.json) |
+
+Para reproducir: con `npm run dev` levantado, iniciar otro Vite accesible desde Docker (`cd client && npx vite --host 0.0.0.0 --port 5174`), porque el de `:5173` solo escucha en `localhost`; después, desde la raíz, `docker run --rm -v "<ruta>/docs/zap:/zap/wrk:rw" -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py <args> -r <reporte>.html -J <reporte>.json -I`. `-j` suma el AJAX spider, necesario porque el frontend es una SPA. El baseline es **pasivo**: navega y mira las respuestas, no envía ataques ni usa token.
+
+Resultado: 0 FAIL, 10 WARN en el frontend y 3 en la API (más alertas informativas).
+
+| Alerta ZAP (id) | Riesgo ZAP | Dónde | Hallazgo manual relacionado | Cruce |
+|---|---|---|---|---|
+| Content Security Policy (CSP) Header Not Set (10038) | Medium | Web: `/`, `/login` | Headers: CSP "No" | **Coincide**, pero ZAP lo marca en el HTML del frontend y la revisión manual en la API (ver nota) |
+| Missing Anti-clickjacking Header (10020) | Medium | Web: `/` | Headers: X-Frame-Options "No" | **Coincide** (ídem) |
+| X-Content-Type-Options Header Missing (10021) | Low | Web: `/`, `/src/main.tsx` | Headers: X-Content-Type-Options "No" | **Coincide** (ídem) |
+| Cross-Domain Misconfiguration (10098) | Medium | API: `/api/projects` y demás; web: archivos de Vite | Headers: CORS `*`; candidato MEDIUM (`server/src/app.ts:12`) | **Coincide** en la API. En la web el `*` lo pone el servidor de desarrollo de Vite |
+| Server Leaks Information via "X-Powered-By" (10037) | Low | API: todas las rutas; web: `/api/auth/login` vía proxy | Headers: `X-Powered-By: Express`; candidato LOW | **Coincide** |
+| Permissions Policy Header Not Set (10063) | Low | Web | No se había revisado | **Nuevo de ZAP** (mismo origen: no hay middleware de headers) |
+| Cross-Origin-Embedder-Policy / Cross-Origin-Opener-Policy Missing (90004) | Low | Web | No se había revisado | **Nuevo de ZAP** (ídem) |
+| Information Disclosure - Suspicious Comments (10027) | Info | Web: `node_modules/.vite/deps/*.js` | - | **Falso positivo**: son `TODO` de React y React Router servidos por el servidor de desarrollo, no código de TaskFlow |
+| Storable and Cacheable Content / Non-Storable Content (10049) | Info | Web y API | - | Informativo, sin riesgo: no hay datos sensibles cacheables sin token |
+| Modern Web Application (10109) | Info | Web | - | Informativo: avisa que conviene el AJAX spider, que ya se usó |
+| No lo detecta | - | - | Strict-Transport-Security ausente | Esperable: ZAP solo la reporta sobre HTTPS y la app local corre en HTTP |
+| No lo detecta | - | - | **SEC-01** SQLi en `search` | El baseline no ataca y sin token no llega a `GET /projects/:id/tasks`. Haría falta un *active scan* autenticado |
+| No lo detecta | - | - | **SEC-02** PATCH/DELETE sin membresía | Control de acceso entre dos usuarios: ningún escáner lo ve sin conocer las reglas de negocio |
+| No lo detecta | - | - | Secreto JWT por defecto, enumeración y bloqueo de cuentas, 500 por campo desconocido | Requieren leer el código o enviar requests específicas |
+| No lo detecta | - | - | Dependencias vulnerables (`npm audit`) | Fuera de alcance de ZAP; lo cubre `npm audit` |
+
+**Nota sobre la API:** sin token, el spider solo recibe respuestas 401 y 404 en JSON. ZAP no evalúa CSP ni anti-clickjacking en respuestas que no son HTML, y a su umbral por defecto tampoco X-Content-Type-Options en errores 4xx. Por eso esos tres headers aparecen solo en el frontend, aunque la API tampoco los envía (`curl -i` a `/api/health`, tabla de headers de arriba).
+
+**Conclusión:** ZAP confirma los 5 hallazgos de headers y CORS, y suma 3 headers que no se habían revisado (Permissions-Policy, COEP, COOP), todos con la misma remediación: agregar un middleware de headers (por ejemplo `helmet`) y restringir el origen de CORS. Los dos hallazgos más graves, SEC-01 y SEC-02, solo aparecieron en la revisión manual: el escaneo pasivo complementa las pruebas manuales, no las reemplaza.
+
 ## Control verificado
 
 | Control de seguridad verificado | |
