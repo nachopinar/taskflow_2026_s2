@@ -119,7 +119,7 @@ Baseline scan (ZAP 2.17.0, imagen `ghcr.io/zaproxy/zaproxy:stable`) ejecutado el
 
 Para reproducir: con `npm run dev` levantado, iniciar otro Vite accesible desde Docker (`cd client && npx vite --host 0.0.0.0 --port 5174`), porque el de `:5173` solo escucha en `localhost`; después, desde la raíz, `docker run --rm -v "<ruta>/docs/zap:/zap/wrk:rw" -t ghcr.io/zaproxy/zaproxy:stable zap-baseline.py <args> -r <reporte>.html -J <reporte>.json -I`. `-j` suma el AJAX spider, necesario porque el frontend es una SPA. El baseline es **pasivo**: navega y mira las respuestas, no envía ataques ni usa token.
 
-Resultado: 0 FAIL, 10 WARN en el frontend y 3 en la API (más alertas informativas).
+Resultado: 0 FAIL; 10 reglas en WARN en el frontend (7 de riesgo Medium o Low y 3 informativas) y 3 en la API (2 de riesgo y 1 informativa).
 
 | Alerta ZAP (id) | Riesgo ZAP | Dónde | Hallazgo manual relacionado | Cruce |
 |---|---|---|---|---|
