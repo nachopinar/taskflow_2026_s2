@@ -112,3 +112,37 @@ jobs:
         run: npm ci
       - name: Compilar el cliente
         run: npm run build:client
+
+  # Hoy termina en rojo: los 12 tests @known-bug (D1-D11 de docs/reporte-tests-e2e.md)
+  # fallan a propósito porque la app no cumple la spec, igual que auth-findings en `tests`.
+  e2e:
+    name: Tests end-to-end (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            client/package-lock.json
+            e2e/package-lock.json
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Generar el cliente de Prisma
+        run: npx prisma generate
+        working-directory: server
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - name: Correr la suite end-to-end
+        run: npm run test:e2e
+      - name: Subir el reporte de Playwright
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 14
