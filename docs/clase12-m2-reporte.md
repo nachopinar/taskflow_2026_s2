@@ -67,7 +67,7 @@ Las expectativas se escribieron antes de ejecutar, a partir del código.
 | SEC-01 | |
 |---|---|
 | **Título** | Inyección SQL en la búsqueda de tareas |
-| **Severidad** | CRITICAL |
+| **Severidad** | **6.5 MEDIUM** (CVSS 3.1 base) · [`CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N`](https://www.first.org/cvss/calculator/3.1#CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N). Antes se había calificado CRITICAL a criterio; ver [justificación](#cvss-31-de-sec-01-y-sec-02). |
 | **Descripción** | `findTasks` concatena `search` en `$queryRawUnsafe` (`server/src/modules/tasks/tasks.repository.ts:33`). |
 | **Pasos de reproducción** | 1. Iniciar sesión como Bob y crear un proyecto propio.<br>2. `GET /api/projects/:id/tasks` con `search=')) OR 1=1 --`: devuelve tareas de todos los proyectos, incluida la privada de Ana, donde Bob no es miembro.<br>3. Con `search=')) UNION SELECT id,<id>,email,substr(passwordHash,1,7),'TODO','LOW',NULL,NULL,createdAt,createdAt FROM users --`, donde `<id>` es el número del proyecto: devuelve emails y el inicio de cada hash. |
 | **Impacto** | Cualquier usuario registrado lee toda la base, incluidos emails y hashes de contraseñas. |
@@ -76,11 +76,30 @@ Las expectativas se escribieron antes de ejecutar, a partir del código.
 | SEC-02 | |
 |---|---|
 | **Título** | Editar o borrar tareas de proyectos ajenos |
-| **Severidad** | HIGH |
+| **Severidad** | **8.3 HIGH** (CVSS 3.1 base) · [`CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:H`](https://www.first.org/cvss/calculator/3.1#CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:H); ver [justificación](#cvss-31-de-sec-01-y-sec-02). |
 | **Descripción** | `PATCH` y `DELETE /tasks/:taskId` no usan `requireTaskProjectMember` (`server/src/modules/tasks/tasks.routes.ts:17-18`). |
 | **Pasos de reproducción** | 1. Ana crea un proyecto y dos tareas.<br>2. Bob envía `PATCH /api/tasks/:id` con `{"title":"Modificada por Bob"}`: 200.<br>3. Bob envía `DELETE /api/tasks/:id`: 204, y la tarea desaparece de la lista de Ana. |
 | **Impacto** | Cualquier usuario registrado altera o borra tareas ajenas. Los ids son secuenciales (`task-13`), así que se pueden recorrer. |
 | **Remediación propuesta** | Agregar `requireTaskProjectMember()` a ambas rutas, y exigir el rol que pida la spec para borrar. |
+
+### CVSS 3.1 de SEC-01 y SEC-02
+
+Puntajes base calculados con la [calculadora de FIRST](https://www.first.org/cvss/calculator/3.1) (los links de la fila de severidad abren cada vector ya cargado). Los supuestos se verificaron el 2026-11-17 contra la API local (rama `dev`, `eb8fe38`), con usuarios y proyectos nuevos.
+
+| Métrica | SEC-01 (SQLi en búsqueda) | SEC-02 (PATCH/DELETE sin membresía) |
+|---|---|---|
+| **AV** Vector de ataque | **N**: request HTTP a la API | **N**: request HTTP a la API |
+| **AC** Complejidad | **L**: un único payload en `search`, sin condiciones de carrera | **L**: basta con el id de la tarea, que es secuencial (`task-13`) |
+| **PR** Privilegios | **L**: hace falta un token de cualquier usuario y un proyecto propio | **L**: hace falta un token de cualquier usuario, sin ser miembro |
+| **UI** Interacción | **N** | **N** |
+| **S** Alcance | **U**: la base que se lee es la de la propia API | **U**: solo afecta datos de la API |
+| **C** Confidencialidad | **H**: con `UNION SELECT` se lee cualquier tabla, incluidos emails y hashes de `users` | **L**: `PATCH` con body `{}` responde 200 con la tarea ajena completa (título, descripción, proyecto); no expone comentarios, historial ni usuarios |
+| **I** Integridad | **N**: un `UPDATE` apilado (`x')); UPDATE tasks SET title='pwned' ... --`) respondió 200 y la tarea quedó igual; Prisma ejecuta una sola sentencia | **H**: se modifica cualquier campo de cualquier tarea de cualquier proyecto |
+| **A** Disponibilidad | **N**: no se logró degradar el servicio; los payloads mal formados dan 500 solo a quien los envía | **H**: `DELETE` borra la tarea con sus comentarios, historial y tags (Ana recibe 404 después); recorriendo ids se vacían todos los proyectos |
+| **Vector** | `CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N` | `CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:L/I:H/A:H` |
+| **Puntaje base** | **6.5 MEDIUM** | **8.3 HIGH** |
+
+**Por qué SEC-01 baja de CRITICAL a MEDIUM:** el puntaje base solo mide lo demostrado (lectura). Con `PR:N` sería 7.5, pero el registro abierto igual exige un token, que es `PR:L`. El impacto real puede ser mayor, porque con los hashes se puede intentar crackear contraseñas y tomar cuentas, pero eso es un ataque encadenado que CVSS base no suma. Por eso se mantiene como **primera prioridad de remediación** junto a SEC-02.
 
 **Otros candidatos**
 
