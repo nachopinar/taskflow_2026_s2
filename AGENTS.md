@@ -29,10 +29,11 @@ Desde la raíz:
 | `npm test` | Suite de API (Jest, en serie) |
 | `npm run test:coverage` | Suite con cobertura y umbrales (70% líneas, 60% ramas) |
 | `npm run build` / `npm run build:client` | Compila server / client con `tsc` |
+| `npm run lint` | ESLint sobre `server/src` (config en `server/eslint.config.mjs`) |
 
 Para verificar tipos sin compilar: `npx --prefix server tsc -p server/tsconfig.json --noEmit` y `npx --prefix client tsc -p client/tsconfig.json --noEmit`.
 
-`npm run lint` hoy no funciona: ESLint no está en las dependencias ni configurado. No lo arregles por tu cuenta; usá el chequeo de tipos.
+`npm run lint` corre ESLint (`@eslint/js` + `typescript-eslint` recomendados) sobre `server/src` y tiene que terminar sin errores. No desactives reglas en la config para que pase; arreglá el código. `eslint-disable-next-line` solo con un motivo claro (ej.: `no-console` en el arranque y en el error handler).
 
 ## Antes de dar una tarea por terminada
 
